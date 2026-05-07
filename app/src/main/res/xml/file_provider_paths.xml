@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+    FileProvider exposes our internal photo directory to the camera app
+    via content:// URIs so it can write JPEGs into filesDir/photos/ without
+    needing legacy WRITE_EXTERNAL_STORAGE.
+    -->
+    <files-path
+        name="photos"
+        path="photos/" />
+</paths>

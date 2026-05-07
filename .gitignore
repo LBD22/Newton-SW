@@ -1,0 +1,51 @@
+# ─── Gradle / Android build artifacts ───────────────────────────────────
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ─── Android-Studio / IntelliJ project files (regenerate on open) ───────
+.idea/
+*.iml
+
+# ─── Local-machine config (NEVER commit) ────────────────────────────────
+# SDK location, JDK toolchain — Gradle reads these from the host.
+local.properties
+
+# ─── Secrets ────────────────────────────────────────────────────────────
+# Real release keystore + the props that point at it. The .example file
+# is committed as a template.
+keystore.properties
+*.jks
+*.keystore
+*.p12
+.env
+.env.*
+
+# ─── KSP / Room generated outputs ───────────────────────────────────────
+# Schemas under data/schemas/ ARE committed (migration tests need them).
+**/build/generated/
+**/build/intermediates/
+
+# ─── Claude Code workspace ──────────────────────────────────────────────
+# Skills/commands/agents/rules ARE committed as project IP.
+# settings.local.json is per-machine (allow-list paths) — keep out.
+.claude/settings.local.json
+
+# ─── OS junk ────────────────────────────────────────────────────────────
+.DS_Store
+._*
+Thumbs.db
+
+# ─── Logs / temp ────────────────────────────────────────────────────────
+*.log
+*.tmp
+hs_err_pid*
+
+# ─── Test outputs ───────────────────────────────────────────────────────
+# Unit-test reports / results live under build/ — already covered above.
+# Keep this section explicit in case CI swaps the layout.
+**/test-results/
+**/reports/

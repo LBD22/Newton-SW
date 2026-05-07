@@ -1,0 +1,98 @@
+package ru.newton.fieldapp.gnss.ntrip
+
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import ru.newton.fieldapp.core.bluetooth.CommandSpp
+import ru.newton.fieldapp.core.bluetooth.LinkState
+import ru.newton.fieldapp.core.bluetooth.SppTransport
+import ru.newton.fieldapp.core.logging.AppLog
+import ru.newton.fieldapp.gnss.data.GnssStatusStore
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Bridges the NTRIP RTCM stream to [CommandSpp]`.write(bytes)`.
+ *
+ * **Protocol-critical:** the bytes coming from the caster are RTCM corrections
+ * that the receiver consumes via `input set bluetooth`. Per
+ * `docs/protocol-newton.md` § RTCM flow, this stream MUST go to the CommandSPP
+ * channel — DataSPP is phone-RX only and silently drops anything we'd write.
+ * Writing RTCM to DataSPP keeps the fix stuck on Single/Float forever, so this
+ * forwarder is the single chokepoint for getting it right.
+ *
+ * NTR-004 (GPGGA upstream): we use [NtripRawStreamer] (raw socket) instead of
+ * OkHttp so the same TCP connection can carry our synthesised GPGGA upstream
+ * — VRS casters require this to drive the virtual reference station. The
+ * sentence is built from [GnssStatusStore.status] every 10s; if there is no
+ * fix yet, no GPGGA is sent and the caster falls back to a generic mountpoint.
+ *
+ * Lifecycle: [start] is idempotent — calling with a different profile cancels
+ * the previous stream first. [stop] tears down the forwarder without touching
+ * the underlying transports.
+ */
+@Singleton
+class NtripForwarder(
+    private val commandSpp: SppTransport,
+    private val statusStore: GnssStatusStore,
+    private val log: AppLog,
+    ioDispatcher: CoroutineDispatcher,
+) {
+    @Inject
+    constructor(
+        @CommandSpp commandSpp: SppTransport,
+        statusStore: GnssStatusStore,
+        log: AppLog,
+    ) : this(commandSpp, statusStore, log, Dispatchers.IO)
+
+    private val parentJob = SupervisorJob()
+    private val scope = CoroutineScope(parentJob + ioDispatcher)
+    private var streamJob: Job? = null
+    private val streamer = NtripRawStreamer(
+        ioDispatcher = ioDispatcher,
+        log = log,
+        gpggaProvider = { GpggaBuilder.fromStatus(statusStore.status.value) },
+    )
+
+    val state: StateFlow<NtripState> = streamer.state
+
+    @Volatile
+    var activeProfile: NtripProfile? = null
+        private set
+
+    fun start(profile: NtripProfile) {
+        if (activeProfile?.id == profile.id && streamJob?.isActive == true) return
+        streamJob?.cancel()
+        activeProfile = profile
+        streamJob = scope.launch {
+            log.ntrip("Forwarding ${profile.host}/${profile.mountpoint} → CommandSPP (GPGGA upstream on)")
+            streamer.streamMountpoint(profile).collect { chunk ->
+                if (commandSpp.linkState.value is LinkState.Connected) {
+                    runCatching { commandSpp.write(chunk) }
+                        .onFailure { log.ntrip("CommandSPP.write failed: ${it.message}", it) }
+                } else {
+                    // Drop — when the BT link comes back, future chunks land on it.
+                    log.ntrip("Dropped ${chunk.size}B RTCM: CommandSPP=${commandSpp.linkState.value}")
+                }
+            }
+        }
+    }
+
+    fun stop() {
+        streamJob?.cancel()
+        streamJob = null
+        activeProfile = null
+        streamer.resetState()
+    }
+
+    fun shutdown() {
+        stop()
+        scope.cancel()
+    }
+}

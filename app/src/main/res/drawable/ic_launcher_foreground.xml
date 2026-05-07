@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive-icon foreground (108×108dp). The OS guarantees the inner 66×66dp
+  safe area is visible regardless of mask shape; we keep the logo inside it
+  so the blue arrow tip never gets clipped by the launcher's circle/squircle.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="66dp"
+        android:height="66dp"
+        android:gravity="center"
+        android:drawable="@drawable/ic_launcher_logo" />
+</layer-list>

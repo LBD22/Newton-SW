@@ -1,0 +1,44 @@
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{kt,kts}]
+max_line_length = off
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Compose convention: top-level @Composable functions are PascalCase.
+# Disabling the rule globally is the conventional fix used in every modern Android
+# Compose codebase — narrower file-pattern overrides for ktlint 1.5+ are still flaky.
+ktlint_standard_function-naming = disabled
+
+# Builders like `Color()`, `Modifier.x.y.z` and Gradle DSL chains read more
+# clearly inline than aggressively wrapped onto separate lines.
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+
+# Comment alignment in the colour palette is intentional readability help.
+ktlint_standard_no-multi-spaces = disabled
+
+# We use `*` imports rarely but never as a code-smell to fail the build over.
+ktlint_standard_no-wildcard-imports = disabled
+
+# Compact sealed data-class hierarchies are deliberately one-line — `class-signature`
+# would force every variant onto 4 lines for almost no readability gain.
+ktlint_standard_class-signature = disabled
+
+# `init { require(...) }` on one line is idiomatic for invariant guards.
+ktlint_standard_statement-wrapping = disabled
+
+# Blank-line-between-declarations adds clutter to dense sealed hierarchies and
+# enum families (NewtonSource, NewtonRate, ...) where the items belong together.
+ktlint_standard_blank-line-before-declaration = disabled
+
+# Single-expression `when` bodies on the equals line are idiomatic Kotlin.
+ktlint_standard_function-signature = disabled
