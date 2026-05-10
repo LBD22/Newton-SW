@@ -30,9 +30,8 @@ keystore.properties
 **/build/intermediates/
 
 # ─── Claude Code workspace ──────────────────────────────────────────────
-# Skills/commands/agents/rules ARE committed as project IP.
-# settings.local.json is per-machine (allow-list paths) — keep out.
-.claude/settings.local.json
+# Skills/commands/agents/rules live locally as per-machine AI tooling.
+.claude/
 
 # ─── OS junk ────────────────────────────────────────────────────────────
 .DS_Store
