@@ -13,11 +13,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import ru.newton.fieldapp.core.bluetooth.CommandSpp
 import ru.newton.fieldapp.core.bluetooth.DataSpp
 import ru.newton.fieldapp.core.bluetooth.SppTransport
 import ru.newton.fieldapp.data.preferences.LastDeviceStore
@@ -29,16 +27,15 @@ class BluetoothConnectViewModel
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
-        @DataSpp dataSpp: SppTransport,
-        @CommandSpp commandSpp: SppTransport,
+        @DataSpp spp: SppTransport,
         private val lastDevice: LastDeviceStore,
     ) : ViewModel() {
         private val _state = MutableStateFlow(BluetoothConnectState())
         val state: StateFlow<BluetoothConnectState> = _state.asStateFlow()
 
         init {
-            combine(dataSpp.linkState, commandSpp.linkState) { d, c -> d to c }
-                .onEach { (d, c) -> _state.value = _state.value.copy(dataLink = d, commandLink = c) }
+            spp.linkState
+                .onEach { link -> _state.value = _state.value.copy(link = link) }
                 .launchIn(viewModelScope)
             refresh()
         }

@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
@@ -36,16 +36,21 @@ import ru.newton.fieldapp.domain.receiver.RoverMode
 @Composable
 fun RoverSettingsScreen(
     onBack: () -> Unit,
+    onNavigateToApply: () -> Unit = {},
     viewModel: RoverSettingsViewModel = hiltViewModel(),
+    pendingViewModel: ru.newton.fieldapp.features.settings.nav.PendingChangesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val pendingCount by pendingViewModel.pendingCount.collectAsStateWithLifecycle()
     RoverSettingsContent(
         state = state,
+        pendingCount = pendingCount,
         onModeSelected = viewModel::onModeSelected,
         onMaskChanged = viewModel::onMaskChanged,
         onMaskCommit = viewModel::onMaskCommit,
         onRtcmIdChanged = viewModel::onRtcmIdChanged,
         onBack = onBack,
+        onNavigateToApply = onNavigateToApply,
     )
 }
 
@@ -53,11 +58,13 @@ fun RoverSettingsScreen(
 @Composable
 private fun RoverSettingsContent(
     state: RoverSettingsState,
+    pendingCount: Int,
     onModeSelected: (RoverMode) -> Unit,
     onMaskChanged: (String) -> Unit,
     onMaskCommit: () -> Unit,
     onRtcmIdChanged: (String) -> Unit,
     onBack: () -> Unit,
+    onNavigateToApply: () -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -74,6 +81,20 @@ private fun RoverSettingsContent(
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
+        },
+        bottomBar = {
+            if (pendingCount > 0) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    ru.newton.fieldapp.core.ui.components.PendingBanner(
+                        pendingCount = pendingCount,
+                        onApply = onNavigateToApply,
+                    )
+                }
+            }
         },
     ) { padding ->
         Column(

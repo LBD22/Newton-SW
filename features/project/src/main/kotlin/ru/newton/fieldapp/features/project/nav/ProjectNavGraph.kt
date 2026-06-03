@@ -50,6 +50,10 @@ fun NavGraphBuilder.projectGraph(navController: NavController) {
                 onOpenProject = { id -> navController.navigate(detailsRoute(id)) },
                 onOpenPoints = { id -> navController.navigate(pointsListRoute(id)) },
                 onOpenCalibration = { navController.navigate(CALIBRATION_ROUTE) },
+                // Cross-graph nav into the Survey tab's POINT route. The
+                // bottom-nav indicator follows the active backstack so the
+                // Survey tab lights up automatically.
+                onSurveyPoint = { navController.navigate("survey/point") },
             )
         }
         composable(CALIBRATION_ROUTE) {

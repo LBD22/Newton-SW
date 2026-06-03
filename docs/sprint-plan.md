@@ -34,7 +34,7 @@ project in the list. Once confirmed, Sprint 1 closes.
 
 ---
 
-## Sprint 2 — CRS and basic export (weeks 3–4) ← **CURRENT**
+## Sprint 2 — CRS and basic export (weeks 3–4)
 
 - [x] CRS-001: WGS-84 geo as baseline (no transform needed, passthrough)
 - [x] CRS-002: UTM 36N forward/inverse
@@ -42,9 +42,11 @@ project in the list. Once confirmed, Sprint 1 closes.
 - [x] CRS-004: СК-42 GK (Helmert 7-param to WGS-84) — also covers СК-95
 - [~] CRS-005: EGM-86 geoid baked in — code path ready (`Egm86`), 1440×721 float32
       grid resource not yet shipped. `undulationM()` returns 0 until grid lands.
+      Remaining MVP gap; awaiting external data deliverable.
 - [x] PRJ-003: CRS picker in project creation
-- [ ] PRJ-004: Change CRS on existing project with recalc preview
-      (deferred: Sprint 3 — needs project-details screen polish first)
+- [x] PRJ-004: Change CRS on existing project with recalc preview
+      (closed 2026-05-05 — `features/project/changecrs/`, preview of 5 points,
+      Apply re-projects all without bumping revision)
 - [x] PRJ-005: Manual point entry with N/E/H
 - [x] PRJ-013: CSV import wizard (basic — no column-mapping wizard yet,
       header auto-detection only; bad rows surface as issues, good rows save)
@@ -102,9 +104,11 @@ auto-starting `GnssForegroundService` on cold boot. Slip to Sprint 4 polish.
 - [x] CMD-001: `CommandSession` with handshake (AT → OK → get command mode → set on)
 - [x] CMD-002: Parser for four OK replies (`OkKind`)
 - [x] CMD-003: `NewtonCommandBuilder` with all MVP commands (delivered in Sprint 1)
-- [~] CMD-004: `CommandQueue` in Room — deferred. The in-memory
-      `PendingChangesService` is the queue for now; on-disk persistence so the
-      queue survives a crash mid-session lands when the failure mode is observed.
+- [x] CMD-004: `CommandQueue` in Room — closed 2026-05-05 in Sprint 8. New
+      `pending_patch` Room table (single row, JSON blob) at DB v7 with auto-migration;
+      `PendingPatchStore` / `RoomPendingPatchStore` persist `ReceiverConfigPatch`
+      across process death. `PendingChangesService` loads on init, persists on
+      every update, clears on apply.
 - [x] CMD-005: `PendingChangesService`
 - [x] CMD-006: `ApplyReceiverConfigUseCase` with Flow<ApplyProgress>
 - [x] SET-010: Rover settings screen (mode, mask, RTCM id)
@@ -137,8 +141,9 @@ they need both `:domain` (`ReceiverConfigPatch`, `ApplyProgress`) and
 - [x] SET-011: Correction source screen
 - [x] SET-012: NTRIP profile list
 - [x] SET-013: NTRIP new/edit profile
-- [ ] SET-014: Output messages — deferred (data path ready, UI missing)
-- [ ] SET-015: Output streams — deferred (same)
+- [x] SET-014: Output messages — `OutputConfigScreen` has full add/remove
+      dialogs per message type (closed 2026-05-05, pre-existing).
+- [x] SET-015: Output streams — same screen exposes the sources×targets dialog.
 
 **Definition of done:** In open field, Single → Float → Fixed in ≤60 s using
 public NTRIP caster. Pending hardware-in-the-loop. Critical invariant:
@@ -148,13 +153,19 @@ public NTRIP caster. Pending hardware-in-the-loop. Critical invariant:
 
 ## Sprint 6 — Survey and map (weeks 11–12)
 
-- [~] UI-002: OSMDroid integration — done (MAPNIK tiles, AndroidView wrapper).
-      MBTiles offline support deferred (file-picker UI + tile-source binding).
+- [x] UI-002: OSMDroid integration — MAPNIK tiles + AndroidView wrapper, plus
+      MBTiles offline support (closed 2026-05-05). `OfflineTilesPreferences` +
+      `OfflineTilesScreen` import a local `.mbtiles` into `filesDir/offline_tiles/`;
+      `MapSurveyScreen` swaps `OfflineTileProvider` ↔ `TileSourceFactory.MAPNIK`
+      via `DisposableEffect`.
 - [x] SUR-001: Survey tab root with index + nav graph
 - [x] SUR-010: Map Survey with real-time cursor (auto-pan on fix)
 - [x] SUR-011: Point Survey with epoch averaging (mean lat/lon/h, σH, save)
-- [ ] SUR-012: Line Survey by points — deferred (Sprint 8 polish)
-- [ ] SUR-014: Track recording — deferred (Sprint 8 polish)
+- [x] SUR-012: Line Survey by points — closed in Sprint 8
+      (`:features:survey/line/`, multi-vertex capture with per-vertex epoch
+      averaging, saves as `<lineName>_v0..vN-1` Points).
+- [x] SUR-014: Track recording — `TrackRecordingScreen`/`ViewModel` already in
+      `:features:survey/track/`, wired to nav (verified 2026-05-05).
 - [~] SUR-101: Save-point inline (no separate dialog yet — name/code fields
       live on the PointSurvey screen)
 - [x] SET-111: Survey defaults (min epochs, σH/σV tolerances) via DataStore
@@ -169,16 +180,24 @@ contour walk pending hardware verification.
 
 - [~] CAD-001: hand-rolled `DxfReader` (POINT/LINE/LWPOLYLINE) — kabeja still
       missing on Maven; revisit if/when full DXF features are needed.
-- [ ] CAD-002: DXF import wizard UI — deferred (parser ready)
-- [ ] CAD-003: CAD overlay on map — deferred (rendering polylines on
-      OSMDroid via `Polyline` overlay; do when first user requests)
+- [x] CAD-002: DXF import wizard UI — closed 2026-05-05.
+      `DxfImportUseCase.invoke` now takes `allowedLayers: Set<String>? = null`;
+      `DxfImportScreen` flow: pick file → analyse (`DxfImportState.Picking`
+      with checkbox list per layer + entity counts) → import selected.
+      Backwards-compatible: `null` keeps legacy "import everything" behaviour.
+- [x] CAD-003: CAD overlay on map — closed in Sprint 8. Importer publishes
+      a `MapOverlay` (polylines + points, WGS-84 lat/lon) to a singleton
+      `MapOverlayHolder` in `:data/overlay/`. `MapSurveyScreen` renders OSMDroid
+      `Polyline` + `Marker` in a dedicated `cadOverlays` list so the live
+      position marker stays on top.
 - [x] SUR-030: Stakeout target picker (lists project points)
 - [x] SUR-031: Stakeout to point (live distance/azimuth/ΔH, save as-built
       when within tolerance)
 - [ ] SUR-032: Stakeout to line — deferred (math for perpendicular foot is
       ~30 lines; do when needed)
 - [~] SUR-131: As-built save inline on stakeout screen
-- [ ] SUR-132: Stakeout history — deferred
+- [x] SUR-132: Stakeout history — `StakeoutHistoryScreen` in
+      `:features:survey/stakeout/`, wired to nav (verified 2026-05-05).
 - [x] EXP-001: DXF writer (round-trip-tested with NanoCAD-compatible
       format; `Locale.US` decimal separator forced)
 
@@ -190,25 +209,37 @@ end-to-end requires hardware + DXF samples.
 
 ## Sprint 8 — Polish and field tests (weeks 15–16)
 
-- [~] APP-001: minimal "О приложении" screen exists; full multi-step
-      onboarding (permissions → BT pairing → first project → first survey)
-      not implemented.
-- [ ] APP-002–005, SET-090/091 (units / language) — not implemented; the
-      app currently ships ru-RU with metric units only.
-- [ ] All remaining MVP-priority screens from ScreenMap v6
-- [ ] Run full test matrix (Product Review §6.2) twice
-- [ ] Field test with external surveyor
-- [ ] Fix blockers from field test
+- [x] APP-001: "О приложении" screen.
+- [x] APP-002–005: Onboarding wizard — closed 2026-05-05.
+      `OnboardingPreferences` (DataStore boolean) + `OnboardingScreen` in
+      `:app/onboarding/` — 4 steps (permissions → BT pairing → project hint
+      → survey hint). `NewtonNavHost` gates on `OnboardingGateViewModel.completed`.
+- [x] SET-090/091: Units & language — closed 2026-05-05.
+      `UnitsPreferences` (DataStore: `LengthUnit METERS|FEET`,
+      `AngleFormat DECIMAL_DEGREES|DMS`); `LengthFormatter` in `:core:common`
+      handles m↔ft on the display layer. Language toggle deferred to system
+      locale (ru-RU is the only translation today).
+- [x] NTR-004: GPGGA upstream — closed 2026-05-05. `NtripForwarder` switched
+      from OkHttp to `NtripRawStreamer` (raw TCP) so it can write GPGGA
+      upstream on the same connection used for RTCM ingest. `GpggaBuilder`
+      synthesises a checksum-correct `$GPGGA,...*XX\r\n` from `GnssStatus`.
+- [ ] Run full test matrix (Product Review §6.2) twice — pending hardware.
+- [ ] Field test with external surveyor — pending hardware.
+- [ ] Fix blockers from field test — pending hardware.
 
 **Definition of done:** External surveyor completes a full work day (J1–J7
 scenarios) without developer assistance. Results accepted by an office using
 AutoCAD/NanoCAD.
 
-**Status (2026-05-04):** the engineering substrate for all eight sprints is
-in place — protocol, CRS math, NTRIP, command port, survey, stakeout, DXF
-I/O. Sprint 8 polish is the remaining surface-area work; it's bulky but
-non-blocking. The next outstanding deliverable is **field validation with
-real Newton hardware**, which is outside the scope of this codebase.
+**Status (2026-05-05):** Sprint 8 main scope + carry-overs (MBTiles, PRJ-004
+Change CRS, CAD-002 layer picker) closed. The engineering substrate for the
+whole MVP is in place. Remaining gaps:
+
+- **CRS-005**: EGM-86 grid binary (data deliverable, not code).
+- **SUR-032**: Stakeout to line (math + UI, ~30 lines + a screen).
+- **Field validation** with real Newton hardware — outside the codebase.
+
+The Sprint 8 plan from this file is now functionally complete.
 
 ---
 

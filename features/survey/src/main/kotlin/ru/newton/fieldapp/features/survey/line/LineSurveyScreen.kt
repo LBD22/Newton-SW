@@ -25,7 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonInfoBadge
@@ -187,7 +187,7 @@ private fun ProgressCard(state: LineSurveyState, vertexCount: Int) {
             }
             when (state) {
                 is LineSurveyState.Idle -> Text(
-                    "Установите тур на первой точке линии и нажмите «Снять первую вершину».",
+                    "Установите веху на первой точке линии и нажмите «Снять первую вершину».",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -31,10 +31,10 @@ import java.util.UUID
 /**
  * Concrete [SppTransport] backed by Android Bluetooth Classic SPP.
  *
- * One instance per channel role — two singletons live in the Hilt graph,
- * differentiated by [DataSpp] / [CommandSpp] qualifiers. Both share the same
- * standard SPP service UUID; the receiver-side firmware exposes two RFCOMM
- * channels that the Bluedroid stack hands out independently.
+ * The Newton receiver advertises **one** RFCOMM channel under the standard SPP
+ * UUID — NMEA/RTCM downstream and the text command pipe are multiplexed by the
+ * firmware over the same socket. There is exactly one instance in the Hilt
+ * graph; both `@DataSpp` and `@CommandSpp` qualifiers point at it.
  *
  * Reconnect strategy (BT-003):
  *  - socket exception during read → enter `Connecting(attempt=N)`
@@ -46,7 +46,6 @@ import java.util.UUID
  */
 class BluetoothSppTransport(
     @ApplicationContext private val context: Context,
-    private val role: String,
     private val log: AppLog,
 ) : SppTransport {
     private val parentJob = SupervisorJob()
@@ -71,8 +70,13 @@ class BluetoothSppTransport(
     @SuppressLint("MissingPermission")
     override suspend fun connect(deviceAddress: String) {
         socketMutex.withLock {
+            // Idempotent on repeated calls for the same address — multiple
+            // injection sites may invoke connect() symmetrically without
+            // coordinating, and we must not start a second loop.
+            if (requestedAddress == deviceAddress && readJob?.isActive == true) return
             requestedAddress = deviceAddress
             closeSocketLocked()
+            readJob?.cancel()
             readJob = scope.launch { connectLoop(deviceAddress) }
         }
     }
@@ -92,7 +96,7 @@ class BluetoothSppTransport(
     override suspend fun write(bytes: ByteArray) {
         val active = socket
         check(_linkState.value is LinkState.Connected && active != null) {
-            "[$role] write() called while link is ${_linkState.value}"
+            "write() called while link is ${_linkState.value}"
         }
         withContext(Dispatchers.IO) {
             active.outputStream.write(bytes)
@@ -106,7 +110,7 @@ class BluetoothSppTransport(
         while (scope.isActive && requestedAddress == deviceAddress) {
             _linkState.value = LinkState.Connecting(attempt)
             val opened = runCatching { openSocket(deviceAddress) }.getOrElse { t ->
-                log.bt("[$role] connect attempt $attempt failed: ${t.message}", t)
+                log.bt("connect attempt $attempt failed: ${t.message}", t)
                 _linkState.value = LinkState.Error(t.message ?: "Open failed", t)
                 delay(backoffMs(attempt))
                 attempt = (attempt + 1).coerceAtMost(MAX_BACKOFF_ATTEMPTS)
@@ -118,7 +122,7 @@ class BluetoothSppTransport(
                 deviceName = opened.remoteDevice?.name ?: deviceAddress,
                 rssi = null,
             )
-            log.bt("[$role] connected to $deviceAddress")
+            log.bt("connected to $deviceAddress")
             runReadLoop(opened)
 
             // Read loop returned → either we got cancelled (disconnect) or the
@@ -152,7 +156,7 @@ class BluetoothSppTransport(
                 _incoming.emit(buffer.copyOf(read))
             }
         } catch (e: IOException) {
-            log.bt("[$role] read loop interrupted: ${e.message}", e)
+            log.bt("read loop interrupted: ${e.message}", e)
             _linkState.value = LinkState.Error(e.message ?: "Read failed", e)
         }
     }
@@ -167,8 +171,9 @@ class BluetoothSppTransport(
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
     companion object {
-        // RFCOMM SPP service UUID — both DataSPP and CommandSPP advertise this UUID
-        // on the receiver; the firmware allocates two distinct channel numbers.
+        // Standard RFCOMM SPP service UUID. The receiver firmware advertises a
+        // single SDP record under this UUID — see `docs/protocol-newton.md`
+        // § Bluetooth channel for why we open exactly one socket.
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
         private const val READ_CHUNK = 1024
         private const val MAX_BACKOFF_ATTEMPTS = 6 // 1,2,4,8,16,30s ceiling

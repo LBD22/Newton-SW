@@ -38,7 +38,16 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.components.NewtonTile
+import ru.newton.fieldapp.core.ui.components.PendingBanner
 import ru.newton.fieldapp.features.settings.about.AboutScreen
 import ru.newton.fieldapp.features.settings.apply.ApplyScreen
 import ru.newton.fieldapp.features.settings.bluetooth.BluetoothConnectScreen
@@ -88,7 +97,12 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
         composable(BLUETOOTH_ROUTE) {
             BluetoothConnectScreen(onBack = { navController.popBackStack() })
         }
-        composable(ROVER_ROUTE) { RoverSettingsScreen(onBack = { navController.popBackStack() }) }
+        composable(ROVER_ROUTE) {
+            RoverSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToApply = { navController.navigate(APPLY_ROUTE) },
+            )
+        }
         composable(APPLY_ROUTE) { ApplyScreen(onBack = { navController.popBackStack() }) }
         composable(CORRECTION_ROUTE) {
             CorrectionSourceScreen(
@@ -112,13 +126,23 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
                 onSaved = { navController.popBackStack() },
             )
         }
-        composable(OUTPUT_ROUTE) { OutputConfigScreen(onBack = { navController.popBackStack() }) }
+        composable(OUTPUT_ROUTE) {
+            OutputConfigScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToApply = { navController.navigate(APPLY_ROUTE) },
+            )
+        }
         composable(UNITS_ROUTE) { UnitsScreen(onBack = { navController.popBackStack() }) }
         composable(TILES_ROUTE) { OfflineTilesScreen(onBack = { navController.popBackStack() }) }
         composable(GNSS_STATUS_ROUTE) { GnssStatusScreen(onBack = { navController.popBackStack() }) }
         composable(RTK_STATUS_ROUTE) { RtkStatusScreen(onBack = { navController.popBackStack() }) }
         composable(SKYPLOT_ROUTE) { SkyplotScreen(onBack = { navController.popBackStack() }) }
-        composable(PPP_ROUTE) { PppScreen(onBack = { navController.popBackStack() }) }
+        composable(PPP_ROUTE) {
+            PppScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToApply = { navController.navigate(APPLY_ROUTE) },
+            )
+        }
         composable(GSM_ROUTE) { GsmScreen(onBack = { navController.popBackStack() }) }
         composable(BTIO_ROUTE) { BluetoothIoScreen(onBack = { navController.popBackStack() }) }
         composable(BRIDGE_ROUTE) { BridgeScreen(onBack = { navController.popBackStack() }) }
@@ -129,7 +153,11 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsIndexScreen(navController: NavController) {
+private fun SettingsIndexScreen(
+    navController: NavController,
+    pendingViewModel: PendingChangesViewModel = hiltViewModel(),
+) {
+    val pendingCount by pendingViewModel.pendingCount.collectAsStateWithLifecycle()
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -141,38 +169,99 @@ private fun SettingsIndexScreen(navController: NavController) {
                 ),
             )
         },
+        bottomBar = {
+            if (pendingCount > 0) {
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    PendingBanner(
+                        pendingCount = pendingCount,
+                        onApply = { navController.navigate(APPLY_ROUTE) },
+                    )
+                }
+            }
+        },
     ) { padding ->
-        val tiles = listOf(
-            SettingsTile("Bluetooth", Icons.Default.Bluetooth) { navController.navigate(BLUETOOTH_ROUTE) },
-            SettingsTile("Поправки", Icons.Default.CloudDownload) { navController.navigate(CORRECTION_ROUTE) },
-            SettingsTile("Ровер", Icons.Default.GpsFixed) { navController.navigate(ROVER_ROUTE) },
-            SettingsTile("Сообщения", Icons.Default.SettingsInputAntenna) { navController.navigate(OUTPUT_ROUTE) },
-            SettingsTile("GNSS-статус", Icons.Default.SatelliteAlt) { navController.navigate(GNSS_STATUS_ROUTE) },
-            SettingsTile("RTK-статус", Icons.Default.SignalCellularAlt) { navController.navigate(RTK_STATUS_ROUTE) },
-            SettingsTile("Skyplot", Icons.Default.SatelliteAlt) { navController.navigate(SKYPLOT_ROUTE) },
-            SettingsTile("PPP / SBAS", Icons.Default.PrivacyTip) { navController.navigate(PPP_ROUTE) },
-            SettingsTile("GSM", Icons.Default.NetworkCell) { navController.navigate(GSM_ROUTE) },
-            SettingsTile("BT I/O", Icons.Default.BluetoothConnected) { navController.navigate(BTIO_ROUTE) },
-            SettingsTile("Bridge", Icons.Default.CallMerge) { navController.navigate(BRIDGE_ROUTE) },
-            SettingsTile("Запись NMEA", Icons.Default.FiberManualRecord) { navController.navigate(STATIC_OBS_ROUTE) },
-            SettingsTile("Наборы кодов", Icons.Default.LabelImportant) { navController.navigate("survey/codesets") },
-            SettingsTile("Применение", Icons.Default.CheckCircle) { navController.navigate(APPLY_ROUTE) },
-            SettingsTile("Единицы", Icons.Default.Straighten) { navController.navigate(UNITS_ROUTE) },
-            SettingsTile("Офлайн-карты", Icons.Default.Layers) { navController.navigate(TILES_ROUTE) },
-            SettingsTile("О приложении", Icons.Default.Info) { navController.navigate(ABOUT_ROUTE) },
+        val sections = listOf(
+            SettingsSection(
+                label = "Подключение",
+                tiles = listOf(
+                    SettingsTile("Bluetooth", Icons.Default.Bluetooth) { navController.navigate(BLUETOOTH_ROUTE) },
+                    SettingsTile("Поправки", Icons.Default.CloudDownload) { navController.navigate(CORRECTION_ROUTE) },
+                    SettingsTile("BT I/O", Icons.Default.BluetoothConnected) { navController.navigate(BTIO_ROUTE) },
+                    SettingsTile("Bridge", Icons.Default.CallMerge) { navController.navigate(BRIDGE_ROUTE) },
+                    SettingsTile("GSM", Icons.Default.NetworkCell) { navController.navigate(GSM_ROUTE) },
+                ),
+            ),
+            SettingsSection(
+                label = "Приёмник",
+                tiles = listOf(
+                    SettingsTile("Ровер", Icons.Default.GpsFixed) { navController.navigate(ROVER_ROUTE) },
+                    SettingsTile("Сообщения", Icons.Default.SettingsInputAntenna) { navController.navigate(OUTPUT_ROUTE) },
+                    SettingsTile("PPP / SBAS", Icons.Default.PrivacyTip) { navController.navigate(PPP_ROUTE) },
+                    SettingsTile("Применение", Icons.Default.CheckCircle) { navController.navigate(APPLY_ROUTE) },
+                ),
+            ),
+            SettingsSection(
+                label = "Диагностика",
+                tiles = listOf(
+                    SettingsTile("GNSS-статус", Icons.Default.SatelliteAlt) { navController.navigate(GNSS_STATUS_ROUTE) },
+                    SettingsTile("RTK-статус", Icons.Default.SignalCellularAlt) { navController.navigate(RTK_STATUS_ROUTE) },
+                    SettingsTile("Skyplot", Icons.Default.SatelliteAlt) { navController.navigate(SKYPLOT_ROUTE) },
+                    SettingsTile("Запись NMEA", Icons.Default.FiberManualRecord) { navController.navigate(STATIC_OBS_ROUTE) },
+                ),
+            ),
+            SettingsSection(
+                label = "Приложение",
+                tiles = listOf(
+                    SettingsTile("Единицы", Icons.Default.Straighten) { navController.navigate(UNITS_ROUTE) },
+                    SettingsTile("Офлайн-карты", Icons.Default.Layers) { navController.navigate(TILES_ROUTE) },
+                    SettingsTile("Наборы кодов", Icons.Default.LabelImportant) { navController.navigate("survey/codesets") },
+                    SettingsTile("О приложении", Icons.Default.Info) { navController.navigate(ABOUT_ROUTE) },
+                ),
+            ),
         )
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(tiles, key = SettingsTile::title) { tile ->
-                NewtonTile(title = tile.title, icon = tile.icon, onClick = tile.onClick)
+            sections.forEach { section ->
+                ru.newton.fieldapp.core.ui.components.SectionLabel(text = section.label)
+                // Render tiles in chunks of 3 per row. Aspect-ratio square so
+                // visual density matches the previous grid.
+                section.tiles.chunked(3).forEach { row ->
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        row.forEach { tile ->
+                            NewtonTile(
+                                title = tile.title,
+                                icon = tile.icon,
+                                onClick = tile.onClick,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        // pad the last row with invisible Spacers so tiles stay
+                        // 1/3 width when the section has 4 entries (last row has 1).
+                        repeat(3 - row.size) {
+                            androidx.compose.foundation.layout.Spacer(
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+private data class SettingsSection(
+    val label: String,
+    val tiles: List<SettingsTile>,
+)
 
 private data class SettingsTile(
     val title: String,

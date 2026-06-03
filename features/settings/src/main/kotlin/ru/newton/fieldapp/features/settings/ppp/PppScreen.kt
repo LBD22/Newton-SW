@@ -24,7 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -36,6 +36,8 @@ import kotlinx.coroutines.launch
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
+import ru.newton.fieldapp.core.ui.components.PendingBanner
+import ru.newton.fieldapp.features.settings.nav.PendingChangesViewModel
 import ru.newton.fieldapp.data.receiver.PendingChangesService
 import ru.newton.fieldapp.domain.receiver.PppSetting
 import javax.inject.Inject
@@ -93,9 +95,12 @@ class PppViewModel
 @Composable
 fun PppScreen(
     onBack: () -> Unit,
+    onNavigateToApply: () -> Unit = {},
     viewModel: PppViewModel = hiltViewModel(),
+    pendingViewModel: PendingChangesViewModel = hiltViewModel(),
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
+    val pendingCount by pendingViewModel.pendingCount.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -114,7 +119,18 @@ fun PppScreen(
             )
         },
         bottomBar = {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (pendingCount > 0) {
+                    PendingBanner(
+                        pendingCount = pendingCount,
+                        onApply = onNavigateToApply,
+                    )
+                }
                 NewtonPrimaryButton(
                     onClick = {
                         viewModel.queue()

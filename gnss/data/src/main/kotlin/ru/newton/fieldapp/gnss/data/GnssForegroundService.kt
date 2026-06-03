@@ -19,9 +19,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import ru.newton.fieldapp.core.bluetooth.CommandSpp
 import ru.newton.fieldapp.core.bluetooth.DataSpp
-import ru.newton.fieldapp.core.bluetooth.LinkState
 import ru.newton.fieldapp.core.bluetooth.SppTransport
 import ru.newton.fieldapp.core.logging.AppLog
 import ru.newton.fieldapp.gnss.command.CommandSession
@@ -32,24 +30,20 @@ import javax.inject.Inject
 /**
  * Long-running service that owns the GNSS data pipeline:
  *
- *     DataSPP socket  →  NmeaLineAggregator  →  NmeaDispatcher  →  GnssStatusStore
- *                                                                          ↑
- *                                                                  UI collects here
+ *     SPP socket  →  NmeaLineAggregator  →  NmeaDispatcher  →  GnssStatusStore
+ *                                                                      ↑
+ *                                                              UI collects here
  *
- * The service is also responsible for keeping the SPP sockets alive across
- * Doze and background modes, satisfying the foreground-service-connectedDevice
- * use case declared in `AndroidManifest.xml`.
- *
- * Started via [start]; stopped via [stop]. Both DataSPP and CommandSPP are
- * connected to the same MAC address but track their own [LinkState].
+ * The receiver exposes a single RFCOMM channel; @DataSpp and @CommandSpp
+ * qualifiers resolve to the same transport, so one connect() call brings the
+ * whole pipe up. The service keeps it alive across Doze and background modes,
+ * satisfying the foreground-service-connectedDevice use case declared in
+ * `AndroidManifest.xml`.
  */
 @AndroidEntryPoint
 class GnssForegroundService : Service() {
     @Inject @DataSpp
-    lateinit var dataSpp: SppTransport
-
-    @Inject @CommandSpp
-    lateinit var commandSpp: SppTransport
+    lateinit var spp: SppTransport
 
     @Inject lateinit var statusStore: GnssStatusStore
 
@@ -100,16 +94,16 @@ class GnssForegroundService : Service() {
 
         pipelineJob?.cancel()
         pipelineJob = scope.launch {
-            launch { dataSpp.connect(mac) }
-            launch { commandSpp.connect(mac) }
+            launch { spp.connect(mac) }
 
-            // CommandSession starts reading from CommandSPP regardless of link state
-            // (it filters by content). Handshake fires the first time CommandSPP
-            // becomes Connected — Apply triggers handshake() lazily otherwise.
+            // CommandSession starts reading from the shared transport regardless
+            // of link state (it filters by content). Handshake fires the first
+            // time the link becomes Connected — Apply triggers handshake()
+            // lazily otherwise.
             commandSession.start()
 
             launch {
-                dataSpp.incoming.collectLatest { chunk ->
+                spp.incoming.collectLatest { chunk ->
                     val lines = aggregator.feed(chunk)
                     for (line in lines) statusStore.submit(dispatcher.dispatch(line))
                 }
@@ -128,8 +122,7 @@ class GnssForegroundService : Service() {
         aggregator.reset()
         commandSession.stop()
         scope.launch {
-            runCatching { dataSpp.disconnect() }
-            runCatching { commandSpp.disconnect() }
+            runCatching { spp.disconnect() }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)

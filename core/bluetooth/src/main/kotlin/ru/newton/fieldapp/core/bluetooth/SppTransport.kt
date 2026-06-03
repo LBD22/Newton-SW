@@ -6,13 +6,20 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Abstracted Bluetooth SPP (Serial Port Profile) transport.
  *
- * This interface has two named instances in the Hilt graph:
- *  - `@DataSpp`    — receiver → phone stream of NMEA/RTCM sentences
- *  - `@CommandSpp` — bidirectional channel for Newton commands AND RTCM writes
+ * The Newton receiver exposes a **single** RFCOMM channel — NMEA/RTCM downstream
+ * and the text command pipe share that one socket; the firmware multiplexes by
+ * frame type. There is one transport singleton in the Hilt graph, surfaced
+ * under two semantic qualifiers:
  *
- * See `docs/protocol-newton.md` § Bluetooth channels for why there are two,
- * and `docs/protocol-newton.md` § RTCM flow for why RTCM goes to CommandSpp
- * and not DataSpp.
+ *  - `@DataSpp`    — semantic role for "I'm a downstream NMEA/RTCM consumer".
+ *  - `@CommandSpp` — semantic role for "I'm the command/RTCM-upstream producer".
+ *
+ * Both qualifiers resolve to the same instance. The split exists only as a
+ * call-site readability convention and so that future re-architecture can wrap
+ * each role behind its own facade without touching every consumer.
+ *
+ * See `docs/protocol-newton.md` § Bluetooth channel for why there is one socket
+ * and how frames are demuxed by the parsers above this layer.
  *
  * Implementations handle reconnect with exponential backoff, foreground service
  * coordination, and Android 12+ runtime permissions.
@@ -27,6 +34,7 @@ interface SppTransport {
     /**
      * Connect to a paired device by MAC address. Suspends until connected or
      * throws if the underlying socket cannot be opened (after retries).
+     * Idempotent on repeated calls with the same address.
      */
     suspend fun connect(deviceAddress: String)
 
@@ -41,16 +49,16 @@ interface SppTransport {
 }
 
 /**
- * Hilt qualifier for the data SPP channel (receiver → phone).
- * Use when you need to inject the phone-receiving side of the link.
+ * Hilt qualifier marking the downstream NMEA/RTCM role. Resolves to the same
+ * underlying transport as [CommandSpp]; the tag is for call-site readability.
  */
 @javax.inject.Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class DataSpp
 
 /**
- * Hilt qualifier for the command SPP channel (bidirectional; also carries RTCM
- * from phone to receiver — see `docs/protocol-newton.md`).
+ * Hilt qualifier marking the command + RTCM-upstream role. Resolves to the same
+ * underlying transport as [DataSpp]; the tag is for call-site readability.
  */
 @javax.inject.Qualifier
 @Retention(AnnotationRetention.BINARY)

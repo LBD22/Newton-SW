@@ -1,11 +1,10 @@
 package ru.newton.fieldapp.core.bluetooth
 
 /**
- * State of one SPP channel. Per-channel, not aggregated.
+ * State of the single Newton SPP transport.
  *
- * The two transport instances (`@DataSpp` and `@CommandSpp`) each expose their
- * own `StateFlow<LinkState>`. UI combines them where needed (e.g. status strip)
- * but never conflates them into one.
+ * Both `@DataSpp` and `@CommandSpp` injection sites observe the same flow —
+ * the qualifiers are role tags over a shared socket, not independent channels.
  */
 sealed interface LinkState {
     data object Disconnected : LinkState

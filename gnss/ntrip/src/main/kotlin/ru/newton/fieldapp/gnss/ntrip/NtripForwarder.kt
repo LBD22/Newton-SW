@@ -18,14 +18,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Bridges the NTRIP RTCM stream to [CommandSpp]`.write(bytes)`.
+ * Bridges the NTRIP RTCM stream to the receiver via [CommandSpp]`.write(bytes)`.
  *
- * **Protocol-critical:** the bytes coming from the caster are RTCM corrections
- * that the receiver consumes via `input set bluetooth`. Per
- * `docs/protocol-newton.md` § RTCM flow, this stream MUST go to the CommandSPP
- * channel — DataSPP is phone-RX only and silently drops anything we'd write.
- * Writing RTCM to DataSPP keeps the fix stuck on Single/Float forever, so this
- * forwarder is the single chokepoint for getting it right.
+ * The Newton receiver has a single SPP socket; the `@CommandSpp` qualifier is a
+ * semantic role tag, not a separate channel. The receiver still expects RTCM
+ * to arrive after `input set bluetooth` — see `docs/protocol-newton.md`
+ * § RTCM flow.
  *
  * NTR-004 (GPGGA upstream): we use [NtripRawStreamer] (raw socket) instead of
  * OkHttp so the same TCP connection can carry our synthesised GPGGA upstream
@@ -71,14 +69,14 @@ class NtripForwarder(
         streamJob?.cancel()
         activeProfile = profile
         streamJob = scope.launch {
-            log.ntrip("Forwarding ${profile.host}/${profile.mountpoint} → CommandSPP (GPGGA upstream on)")
+            log.ntrip("Forwarding ${profile.host}/${profile.mountpoint} → SPP (GPGGA upstream on)")
             streamer.streamMountpoint(profile).collect { chunk ->
                 if (commandSpp.linkState.value is LinkState.Connected) {
                     runCatching { commandSpp.write(chunk) }
-                        .onFailure { log.ntrip("CommandSPP.write failed: ${it.message}", it) }
+                        .onFailure { log.ntrip("SPP.write failed: ${it.message}", it) }
                 } else {
                     // Drop — when the BT link comes back, future chunks land on it.
-                    log.ntrip("Dropped ${chunk.size}B RTCM: CommandSPP=${commandSpp.linkState.value}")
+                    log.ntrip("Dropped ${chunk.size}B RTCM: link=${commandSpp.linkState.value}")
                 }
             }
         }

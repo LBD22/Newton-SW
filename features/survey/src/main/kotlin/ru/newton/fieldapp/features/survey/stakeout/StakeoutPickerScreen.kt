@@ -1,5 +1,8 @@
 package ru.newton.fieldapp.features.survey.stakeout
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import ru.newton.fieldapp.core.ui.components.EmptyState
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.Flag
+import ru.newton.fieldapp.core.ui.components.NewtonCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,7 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -45,7 +50,7 @@ class StakeoutPickerViewModel
         activeProject: ActiveProjectStore,
         pointRepository: PointRepository,
     ) : ViewModel() {
-        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        @OptIn(ExperimentalCoroutinesApi::class)
         val points: StateFlow<List<Point>> = activeProject.activeId
             .flatMapLatest { id ->
                 if (id == null) flowOf(emptyList()) else pointRepository.observePoints(id)
@@ -87,10 +92,11 @@ private fun StakeoutPickerContent(
             contentAlignment = Alignment.Center,
         ) {
             if (points.isEmpty()) {
-                Text(
-                    "Нет точек в активном проекте. Создайте проект и импортируйте/снимите точки.",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
+                EmptyState(
+                    icon = Icons.Default.Flag,
+                    title = "Нет проектных точек",
+                    message = "Создайте проект и импортируйте/снимите точки, " +
+                        "чтобы вынести их на местность.",
                 )
             } else {
                 LazyColumn(
@@ -98,11 +104,12 @@ private fun StakeoutPickerContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(points, key = Point::id) { point ->
-                        ElevatedCard(
+                        NewtonCard(
                             onClick = { onPick(point.id) },
                             modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(12.dp),
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column {
                                 Text(point.name, style = MaterialTheme.typography.titleMedium)
                                 Text(
                                     "N=${"%.3f".format(point.n)}  E=${"%.3f".format(point.e)}",

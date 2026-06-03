@@ -38,6 +38,11 @@ keystore.properties
 ._*
 Thumbs.db
 
+# ─── Local screenshots / scratch media ──────────────────────────────────
+# Existing tracked screenshots (from initial commit) stay; new captures
+# are local only.
+screenshots/
+
 # ─── Logs / temp ────────────────────────────────────────────────────────
 *.log
 *.tmp

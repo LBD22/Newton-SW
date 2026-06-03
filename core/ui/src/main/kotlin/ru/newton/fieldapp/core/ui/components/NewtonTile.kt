@@ -1,6 +1,7 @@
 package ru.newton.fieldapp.core.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,20 +18,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import ru.newton.fieldapp.core.ui.theme.NewtonTheme
 
 /**
- * Square-aspect grid tile with a centred icon-on-tinted-square and a
- * label below — matches the LandStar-style index dashboards. Used for
- * tab landing screens (Survey, Settings) where 6–10 entry points need
- * to be visible at once on a phone screen.
+ * Square-aspect grid tile per Field Blue Tile-Data spec (§6.1):
+ * white surface · hairline border · 18dp radius · brand-soft icon container
+ * with brand glyph · brand-deep label. No shadow.
  *
- * Sized via aspectRatio so a 2- or 3-column LazyVerticalGrid lays out
- * cleanly on any width. The clickable area covers the whole tile.
+ * Used on the Settings / Survey dashboards where 8–15 entry points need to be
+ * visible. Layout is icon-centred-above-label (rather than the spec's
+ * top-left-stacked) because the existing screens treat this as a launcher
+ * grid — centred reads cleaner at this density.
+ *
+ * For tighter Field Blue compliance on the home screen with hero +
+ * accent/data/system distinction, use [TileHero], [TileAccent], [TileData],
+ * [TileSystem] from `Tiles.kt`.
  */
 @Composable
 fun NewtonTile(
@@ -40,47 +46,48 @@ fun NewtonTile(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val colors = NewtonTheme.colors
+    val shape = RoundedCornerShape(18.dp)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .shadow(1.dp, shape, ambientColor = Color(0x10000000), spotColor = Color(0x10000000))
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(colors.surface)
+            .border(1.dp, colors.hairline, shape)
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(10.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(colors.brandSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = colors.brand,
                 )
             }
             Text(
                 title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.W700),
+                color = colors.brandDeep,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
             )
-            subtitle?.takeIf { it.isNotBlank() }?.let {
+            if (!subtitle.isNullOrBlank()) {
                 Text(
-                    it,
+                    subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.text2,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                 )

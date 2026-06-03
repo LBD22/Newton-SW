@@ -4,8 +4,7 @@ import ru.newton.fieldapp.core.bluetooth.LinkState
 
 data class BluetoothConnectState(
     val pairedDevices: List<PairedDevice> = emptyList(),
-    val dataLink: LinkState = LinkState.Disconnected,
-    val commandLink: LinkState = LinkState.Disconnected,
+    val link: LinkState = LinkState.Disconnected,
     val activeMac: String? = null,
     val needsPermission: Boolean = false,
     val permissionDenied: Boolean = false,

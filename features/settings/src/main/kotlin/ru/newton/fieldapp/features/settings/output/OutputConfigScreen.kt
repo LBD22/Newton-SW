@@ -35,7 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonInfoBadge
@@ -49,15 +49,20 @@ import ru.newton.fieldapp.domain.receiver.StreamTarget
 @Composable
 fun OutputConfigScreen(
     onBack: () -> Unit,
+    onNavigateToApply: () -> Unit = {},
     viewModel: OutputConfigViewModel = hiltViewModel(),
+    pendingViewModel: ru.newton.fieldapp.features.settings.nav.PendingChangesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val pendingCount by pendingViewModel.pendingCount.collectAsStateWithLifecycle()
     var addingMessage by remember { mutableStateOf(false) }
     var addingStream by remember { mutableStateOf(false) }
 
     OutputConfigContent(
         state = state,
+        pendingCount = pendingCount,
         onBack = onBack,
+        onNavigateToApply = onNavigateToApply,
         onApplyDefaults = viewModel::applyMvpDefaults,
         onClearAll = viewModel::clearAll,
         onAddMessageClick = { addingMessage = true },
@@ -90,7 +95,9 @@ fun OutputConfigScreen(
 @Composable
 private fun OutputConfigContent(
     state: OutputConfigState,
+    pendingCount: Int,
     onBack: () -> Unit,
+    onNavigateToApply: () -> Unit,
     onApplyDefaults: () -> Unit,
     onClearAll: () -> Unit,
     onAddMessageClick: () -> Unit,
@@ -115,20 +122,28 @@ private fun OutputConfigContent(
             )
         },
         bottomBar = {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                NewtonSecondaryButton(
-                    onClick = onClearAll,
-                    text = "Очистить",
-                    modifier = Modifier.weight(1f),
-                )
-                NewtonPrimaryButton(
-                    onClick = onApplyDefaults,
-                    text = "MVP-набор",
-                    modifier = Modifier.weight(2f),
-                )
+                if (pendingCount > 0) {
+                    ru.newton.fieldapp.core.ui.components.PendingBanner(
+                        pendingCount = pendingCount,
+                        onApply = onNavigateToApply,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NewtonSecondaryButton(
+                        onClick = onClearAll,
+                        text = "Очистить",
+                        modifier = Modifier.weight(1f),
+                    )
+                    NewtonPrimaryButton(
+                        onClick = onApplyDefaults,
+                        text = "MVP-набор",
+                        modifier = Modifier.weight(2f),
+                    )
+                }
             }
         },
     ) { padding ->

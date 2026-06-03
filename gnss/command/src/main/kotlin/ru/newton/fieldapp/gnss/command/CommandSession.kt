@@ -23,11 +23,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Bidirectional Newton command port session over the [CommandSpp] transport.
+ * Bidirectional Newton command port session over the shared SPP transport.
  *
- * Owns the request/response handshake (CMD-001) and the reply parser
- * (CMD-002) — distinguishing the four OK variants is critical: collapsing
- * them masks command-mode toggles and queue acks.
+ * The receiver multiplexes NMEA frames and command replies on the same socket,
+ * so this session sees both. `awaitOk`/`awaitInfoLine` ignore NMEA noise (lines
+ * starting with `$`) and only honour the four OK-class tokens (CMD-002) or
+ * plain-text info lines.
  *
  * Serialises outbound commands through [sendMutex] so callers cannot
  * interleave a `system save` between an `output add message …` and its `OK!`
@@ -155,7 +156,7 @@ class CommandSession(
     private suspend fun awaitOk(originalCommand: String): OkKind? = withTimeoutOrNull(REPLY_TIMEOUT_MS) {
         while (true) {
             val line = replyChannel.receive().trim()
-            if (line.isEmpty() || line == originalCommand) continue
+            if (line.isEmpty() || line == originalCommand || line.startsWith("$")) continue
             val ok = OkKind.fromToken(line)
             if (ok != null) return@withTimeoutOrNull ok
             // Otherwise a leading info line — keep waiting for the OK that follows.
@@ -168,7 +169,9 @@ class CommandSession(
     private suspend fun awaitInfoLine(originalCommand: String): String? = withTimeoutOrNull(REPLY_TIMEOUT_MS) {
         while (true) {
             val line = replyChannel.receive().trim()
-            if (line.isEmpty() || line == originalCommand) continue
+            // Skip blanks, our own echo, and NMEA frames — only command-port
+            // text replies count as info lines.
+            if (line.isEmpty() || line == originalCommand || line.startsWith("$")) continue
             if (OkKind.fromToken(line) != null) {
                 // No info line preceded the OK — return the OK token itself for diagnostics.
                 return@withTimeoutOrNull line

@@ -44,7 +44,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.theme.LocalFixStatusColors
 
@@ -125,8 +125,11 @@ private fun ActiveBlock(state: StakeoutState.Active, onSave: () -> Unit) {
             .padding(vertical = 8.dp),
     )
 
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    ru.newton.fieldapp.core.ui.components.NewtonCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Цель: ${state.targetName}", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Дистанция: ${"%.3f".format(state.vector.distanceM)} м",
@@ -147,25 +150,21 @@ private fun ActiveBlock(state: StakeoutState.Active, onSave: () -> Unit) {
             )
         }
     }
-    Button(
-        onClick = onSave,
-        enabled = withinTolerance,
-        modifier = Modifier.fillMaxWidth(),
-        colors = if (withinTolerance) {
-            ButtonDefaults.buttonColors(
-                containerColor = LocalFixStatusColors.current.fixed,
-                contentColor = Color.White,
-            )
-        } else {
-            ButtonDefaults.buttonColors()
-        },
-    ) {
-        Text(
-            if (withinTolerance) {
-                "Сохранить как-есть"
-            } else {
-                "Сначала войдите в допуск (${"%.2f".format(state.toleranceM)} м)"
-            },
+    // When in tolerance — bold success-coloured save. Otherwise — disabled
+    // primary (greyed) so the user can't mis-tap before the point is reachable.
+    if (withinTolerance) {
+        ru.newton.fieldapp.core.ui.components.NewtonSuccessButton(
+            onClick = onSave,
+            text = "Сохранить как-есть",
+            icon = Icons.Default.CheckCircle,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    } else {
+        ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton(
+            onClick = onSave,
+            text = "Сначала войдите в допуск (${"%.2f".format(state.toleranceM)} м)",
+            enabled = false,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -223,77 +222,15 @@ private fun DirectionArrow(
     withinTolerance: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val fixed = LocalFixStatusColors.current.fixed
-    val primary = MaterialTheme.colorScheme.primary
-    val container = MaterialTheme.colorScheme.primaryContainer
-    val onTarget = withinTolerance
-
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
-    ) {
-        val rotation = ((targetAzimuthDeg.toFloat() - deviceHeadingDeg) + 360f) % 360f
-        Box(
-            modifier = Modifier
-                .size(220.dp)
-                .clip(CircleShape)
-                .background(if (onTarget) fixed.copy(alpha = 0.18f) else container),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(
-                modifier = Modifier
-                    .size(180.dp)
-                    .aspectRatio(1f)
-                    .rotate(if (onTarget) 0f else rotation),
-            ) {
-                val w = size.width
-                val h = size.height
-                if (onTarget) {
-                    // Bold green check mark — composed of two strokes.
-                    val stroke = Stroke(width = w * 0.10f)
-                    val checkPath = Path().apply {
-                        moveTo(w * 0.22f, h * 0.55f)
-                        lineTo(w * 0.45f, h * 0.78f)
-                        lineTo(w * 0.80f, h * 0.32f)
-                    }
-                    drawPath(checkPath, fixed, style = stroke)
-                } else {
-                    // Filled triangular arrow with a tail — points "up" at 0°.
-                    val centerX = w / 2f
-                    val arrowPath = Path().apply {
-                        moveTo(centerX, h * 0.10f)             // tip
-                        lineTo(w * 0.78f, h * 0.65f)           // bottom-right
-                        lineTo(centerX + w * 0.08f, h * 0.55f) // inner notch right
-                        lineTo(centerX + w * 0.08f, h * 0.92f) // tail right
-                        lineTo(centerX - w * 0.08f, h * 0.92f) // tail left
-                        lineTo(centerX - w * 0.08f, h * 0.55f) // inner notch left
-                        lineTo(w * 0.22f, h * 0.65f)           // bottom-left
-                        close()
-                    }
-                    drawPath(arrowPath, primary)
-                }
-            }
-            // Tiny "N" mark at the top of the disc — orients the user.
-            Canvas(modifier = Modifier.size(220.dp)) {
-                val w = size.width
-                val h = size.height
-                val stroke = Stroke(width = 3f)
-                drawCircle(
-                    color = primary.copy(alpha = 0.25f),
-                    radius = w * 0.48f,
-                    center = Offset(w / 2f, h / 2f),
-                    style = stroke,
-                )
-                // Pip at top representing magnetic north relative to phone —
-                // since canvas is anchored to phone, this stays at 12 o'clock.
-                val pipSize = Size(w * 0.04f, h * 0.04f)
-                drawRoundRect(
-                    color = primary,
-                    topLeft = Offset(w / 2f - pipSize.width / 2f, h * 0.02f),
-                    size = pipSize,
-                )
-            }
-        }
+    // Bearing relative to phone heading — what the surveyor needs to walk
+    // toward. CompassRose handles all the rose / ticks / arrow rendering.
+    val bearing = ((targetAzimuthDeg.toFloat() - deviceHeadingDeg) + 360f) % 360f
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        ru.newton.fieldapp.core.ui.components.CompassRose(
+            bearing = bearing,
+            sizeDp = 240.dp,
+            onTarget = withinTolerance,
+        )
     }
 }
 

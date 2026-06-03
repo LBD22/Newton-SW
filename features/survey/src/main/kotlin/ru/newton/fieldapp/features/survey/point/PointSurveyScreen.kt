@@ -10,25 +10,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import ru.newton.fieldapp.core.ui.components.NewtonCard
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSuccessButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.gnss.data.FixQuality
 
@@ -38,6 +42,12 @@ fun PointSurveyScreen(
     viewModel: PointSurveyViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Drop the Idle "press to start" pre-step — opening this screen IS the
+    // intent to capture a point. Auto-start collecting; if the user navigates
+    // back here after saving they stay in the Saved confirmation.
+    LaunchedEffect(Unit) {
+        if (state is PointSurveyState.Idle) viewModel.start()
+    }
     PointSurveyContent(
         state = state,
         onBack = onBack,
@@ -79,7 +89,14 @@ private fun PointSurveyContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             when (state) {
-                PointSurveyState.Idle -> Idle(onStart)
+                // Idle is a transient state — LaunchedEffect at the screen
+                // level fires start() the moment we land here. Show a small
+                // placeholder so we never render an empty Column.
+                PointSurveyState.Idle -> Text(
+                    "Подготовка…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 is PointSurveyState.Collecting -> Collecting(state, onCancel)
                 is PointSurveyState.Ready -> Ready(state, onNameChanged, onCodeChanged, onSave, onReset)
                 PointSurveyState.Saving -> Text("Сохранение…", style = MaterialTheme.typography.titleMedium)
@@ -91,66 +108,61 @@ private fun PointSurveyContent(
 }
 
 @Composable
-private fun Idle(onStart: () -> Unit) {
-    Text(
-        "Установите тур, удерживайте антенну над пикетом и нажмите «Начать». " +
-            "Будет накоплено N эпох, заданное в Параметрах съёмки.",
-        style = MaterialTheme.typography.bodyMedium,
-    )
-    Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-        Text("Начать накопление")
-    }
-}
-
-@Composable
 private fun Collecting(state: PointSurveyState.Collecting, onCancel: () -> Unit) {
     val noDataYet = state.lastEpochAtUtc == 0L
     val waitingForFix = !noDataYet && state.currentFix == FixQuality.NoFix && state.collected == 0
 
-    Text(
-        "Накоплено: ${state.collected} / ${state.target}",
-        style = MaterialTheme.typography.titleMedium,
-    )
-    LinearProgressIndicator(
-        progress = { state.collected.toFloat() / state.target.toFloat().coerceAtLeast(1f) },
+    androidx.compose.foundation.layout.Box(
         modifier = Modifier.fillMaxWidth(),
-    )
-    when {
-        noDataYet -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    "Нет данных от приёмника",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                Text(
-                    "Проверьте подключение Bluetooth в «Настройки → Подключение». " +
-                        "Также убедитесь, что NMEA-вывод включён на приёмнике.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        waitingForFix -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    "Ожидание фикса…",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    "Приёмник на связи, но решение пока не получено. На открытом небе " +
-                        "обычно занимает 30–60 секунд после первого включения.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        else -> Text(
-            "Текущий фикс: ${describe(state.currentFix)}",
-            style = MaterialTheme.typography.bodyMedium,
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        ru.newton.fieldapp.core.ui.components.EpochProgressRing(
+            current = state.collected,
+            total = state.target,
         )
     }
-    OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Отмена") }
+    // Single unified status row — replaces the two stacked alert cards.
+    // Three modes: hard problem (no data), soft wait (waiting for fix),
+    // or live status (collecting fine).
+    val (statusTitle, statusHint, isProblem) = when {
+        noDataYet -> Triple(
+            "Нет данных от приёмника",
+            "Проверьте Bluetooth-подключение и NMEA-вывод на приёмнике.",
+            true,
+        )
+        waitingForFix -> Triple(
+            "Ожидание фикса…",
+            "На открытом небе обычно 30–60 с после включения.",
+            false,
+        )
+        else -> Triple(
+            "Фикс: ${describe(state.currentFix)}",
+            null,
+            false,
+        )
+    }
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = statusTitle,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isProblem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
+            if (statusHint != null) {
+                Text(
+                    text = statusHint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    NewtonSecondaryButton(
+        onClick = onCancel,
+        text = "Отмена",
+        icon = Icons.Default.Close,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -161,8 +173,8 @@ private fun Ready(
     onSave: () -> Unit,
     onReset: () -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Накоплено эпох: ${state.sampleCount}", style = MaterialTheme.typography.titleMedium)
             Text(
                 "φ=${"%.7f".format(state.averageLat)}°  λ=${"%.7f".format(state.averageLon)}°",
@@ -210,28 +222,38 @@ private fun Ready(
             }
         }
     }
-    Button(
+    NewtonSuccessButton(
         onClick = onSave,
+        text = "Сохранить",
+        icon = Icons.Default.Check,
         enabled = state.name.isNotBlank(),
         modifier = Modifier.fillMaxWidth(),
-    ) { Text("Сохранить") }
-    OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
-        Text("Отменить и накопить заново")
-    }
+    )
+    NewtonSecondaryButton(
+        onClick = onReset,
+        text = "Отменить и накопить заново",
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
 private fun Saved(pointId: Long, onReset: () -> Unit) {
     Text("Точка сохранена (id=$pointId)", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-    Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
-        Text("Снять следующую")
-    }
+    NewtonPrimaryButton(
+        onClick = onReset,
+        text = "Снять следующую",
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
 private fun ErrorState(message: String, onReset: () -> Unit) {
     Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-    Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Назад") }
+    NewtonPrimaryButton(
+        onClick = onReset,
+        text = "Назад",
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 private fun describe(fix: FixQuality): String = when (fix) {

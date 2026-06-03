@@ -2,14 +2,21 @@
 
 Derived from `OSdoc_command_port_2025_11_13` (official firmware manual). For anything not covered here, consult the manual and update this file.
 
-## Bluetooth channels
+## Bluetooth channel
 
-Newton exposes **two independent Bluetooth Classic SPP channels**:
+Newton exposes **one** Bluetooth Classic SPP channel — a single RFCOMM record under the standard SPP UUID `00001101-0000-1000-8000-00805F9B34FB`. Verified with `sdptool` against the T31 firmware: only one RFCOMM channel is advertised.
 
-- **DataSPP** — receiver → phone. Continuous stream of NMEA, ORIENT, COMNAV, RTCM sentences at configured rate (1–20 Hz).
-- **CommandSPP** — bidirectional. Text commands out, text replies in. Also receives RTCM when receiver is configured with `input set bluetooth`.
+The receiver multiplexes everything over that one pipe:
 
-They can fail independently. UI must show both states.
+- Downstream (receiver → phone): continuous NMEA / ORIENT / COMNAV / RTCM frames at the configured rate (1–20 Hz), **and** ASCII reply lines (`OK`, `OK+`, `OK-`, `OK!`, plus the info lines for `get …` queries).
+- Upstream (phone → receiver): text commands, **and** RTCM bytes once `input set bluetooth` is configured.
+
+Implications for our codebase:
+
+- `:core:bluetooth` opens exactly one `BluetoothSocket`. Opening two against the same RFCOMM endpoint produces `read failed, socket might closed or timeout, read ret: -1` on whichever loses the race.
+- `@DataSpp` and `@CommandSpp` are **role tags** for call-site readability, not separate transports. Both qualifiers resolve to the same singleton.
+- Parsers above the transport demux by frame shape: `NmeaLineAggregator` keeps NMEA, `CommandLineAggregator` keeps reply lines, each ignoring the other's frames at the line level.
+- UI shows **one** BT indicator, not two — the previous BT-D / BT-C split was a doc/UI artefact of the false two-channel assumption.
 
 ## Command format
 
@@ -206,11 +213,11 @@ For full list of 56, see official manual. For MVP, configure these on startup:
 
 ## RTCM flow (MVP)
 
-**Claim**: RTCM from NTRIP goes into **CommandSPP**, not DataSPP.
+**Mechanism**: RTCM from NTRIP is written to the shared SPP transport via `@CommandSpp.write(bytes)`. Since the receiver has a single RFCOMM channel, the byte stream physically lands on the same socket as text commands — the firmware demuxes by frame shape (RTCM messages start with `0xD3`, commands are ASCII text terminated by `\r\n`).
 
-**Why**: Receiver is configured with `input set bluetooth`. This subscribes it to accept incoming data on the Bluetooth side. Since the receiver has two BT SPP channels with different roles, and the command side is the bidirectional one, RTCM bytes we push from the phone are written on `@CommandSpp.write(bytes)`.
+**Activation**: The receiver only consumes incoming Bluetooth bytes as RTCM once `input set bluetooth` has been applied. Before that, any bytes we write that aren't recognised commands are silently dropped.
 
-**Failure mode if violated**: Writing RTCM to `@DataSpp` causes silent drop — DataSPP is phone-RX-only. No error shown. Fix never progresses past Single/Float.
+**Why `@CommandSpp` and not `@DataSpp`** in code: it's a semantic role tag — RTCM is part of the "upstream" role that also handles commands. The qualifier choice signals intent at the call site; both resolve to the same transport.
 
 ## Canonical command sequences
 
@@ -228,18 +235,18 @@ output add message M GPGST 1HZ A            → OK!
 output add message M GPGSA 1HZ A            → OK!
 output add message M GPGSV 1HZ A            → OK!
 output add message M GPTRA 1HZ A            → OK!
-output add stream M bluetooth               → OK!   (send NMEA out via DataSPP)
+output add stream M bluetooth               → OK!   (send NMEA out over SPP)
 system save                                 → OK!   (persist)
 ```
 
-After `system save`, RTCM writes to `@CommandSpp` will be accepted by the receiver as RTK corrections.
+After `system save`, RTCM writes to the shared SPP transport will be accepted by the receiver as RTK corrections.
 
 ### Factory reset flow
 
 ```
 config reset        → immediate, not queued
                     → receiver reboots, BT may drop
-(wait 10–15s, reconnect CommandSPP)
+(wait 10–15s, reconnect Bluetooth)
 AT                  → OK
 get command mode    → off (factory default)
 set command mode on → OK+

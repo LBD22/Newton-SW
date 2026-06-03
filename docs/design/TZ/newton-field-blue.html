@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newton Field App — Field Blue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0,0&display=block" rel="stylesheet">
+<style>
+  :root {
+    /* Brand blues — monochrome palette */
+    --brand: #1A5DD8;
+    --brand-deep: #0E2A57;
+    --brand-mid: #4F7FCE;
+    --brand-soft: #DCE7FB;
+    --brand-faint: #EEF3FC;
+    --brand-glow: rgba(26,93,216,0.22);
+
+    /* Surfaces */
+    --bg: #F5F8FC;
+    --surface: #FFFFFF;
+    --surface-tint: #F7FAFD;
+    --surface-deep: #EFF3FA;
+
+    /* Text */
+    --text: #0E2A57;
+    --text-2: rgba(14,42,87,0.66);
+    --text-3: rgba(14,42,87,0.42);
+
+    /* Lines */
+    --hairline: rgba(14,42,87,0.10);
+    --hairline-strong: rgba(14,42,87,0.22);
+    --hairline-soft: rgba(14,42,87,0.06);
+
+    /* Semantic */
+    --success: #16A35B;
+    --success-soft: #D8F1E2;
+    --warning: #D08400;
+    --warning-soft: #FCEDD0;
+    --error: #C0273D;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background:
+      repeating-linear-gradient(to bottom,
+        transparent 0, transparent 30px,
+        rgba(14,42,87,0.025) 30px, rgba(14,42,87,0.025) 31px),
+      radial-gradient(ellipse 60% 30% at 50% 12%, rgba(26,93,216,0.07), transparent 70%),
+      radial-gradient(ellipse 40% 20% at 12% 38%, rgba(26,93,216,0.04), transparent 70%),
+      radial-gradient(ellipse 40% 20% at 88% 72%, rgba(6,182,212,0.04), transparent 70%),
+      var(--bg);
+    min-height: 100vh;
+    padding: 56px 32px 96px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal; font-style: normal;
+    font-size: 22px; line-height: 1;
+    display: inline-block; white-space: nowrap; direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ===== Page header ===== */
+  .page-header {
+    text-align: center;
+    margin-bottom: 56px;
+    position: relative;
+    z-index: 1;
+  }
+  .brand-mark {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 14px 6px 8px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 6px rgba(14,42,87,0.04);
+  }
+  .brand-mark .mark-dot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--brand);
+    position: relative;
+    box-shadow: 0 0 0 3px var(--brand-soft);
+  }
+  .brand-mark .mark-dot::after {
+    content: ''; position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    background: white;
+  }
+  .brand-mark .mark-text {
+    font-size: 11px; font-weight: 800;
+    color: var(--brand-deep);
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .page-header h1 {
+    font-weight: 800; font-size: 34px;
+    letter-spacing: -0.025em;
+    color: var(--brand-deep);
+    line-height: 1.05;
+  }
+  .page-header h1 .accent {
+    color: var(--brand);
+    font-weight: 900;
+  }
+  .page-header p {
+    margin-top: 12px;
+    color: var(--text-2);
+    font-size: 14px;
+    letter-spacing: 0.005em;
+    max-width: 600px;
+    margin-left: auto; margin-right: auto;
+  }
+  .page-header .tokens {
+    margin-top: 20px;
+    display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  }
+  .token {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 12px 5px 7px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    color: var(--text-2);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.04em;
+    box-shadow: 0 1px 2px rgba(14,42,87,0.03);
+  }
+  .token .swatch {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--hairline);
+  }
+
+  /* ===== Row ===== */
+  .row {
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    position: relative;
+    z-index: 1;
+  }
+
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+  .phone-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--text-2);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .phone-label::before {
+    content: ''; width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 0 3px rgba(26,93,216,0.18);
+  }
+
+  .phone {
+    width: 380px; height: 800px;
+    background: var(--surface);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+    border: 7px solid #1a2438;
+    box-shadow:
+      0 30px 60px rgba(14,42,87,0.20),
+      0 12px 28px rgba(14,42,87,0.12),
+      inset 0 0 0 1px rgba(255,255,255,0.6);
+  }
+
+  /* status bar */
+  .status-bar {
+    height: 34px; padding: 8px 24px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 600;
+    color: var(--brand-deep);
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+  .status-bar .material-symbols-outlined { font-size: 16px; }
+
+  /* top bar */
+  .top-bar {
+    height: 58px; padding: 0 10px;
+    display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+  .icon-btn {
+    width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; background: transparent;
+    border: none; color: var(--brand-deep); cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--surface-deep); }
+  .top-bar .title {
+    flex: 1; text-align: center;
+    font-size: 16px; font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--brand-deep);
+    line-height: 1.1;
+  }
+  .top-bar .title small {
+    display: block;
+    font-size: 11px; font-weight: 500;
+    color: var(--text-2);
+    margin-top: 3px;
+    letter-spacing: 0.02em;
+  }
+
+  .screen {
+    flex: 1; padding: 14px 18px 16px;
+    display: flex; flex-direction: column; gap: 12px;
+    min-height: 0;
+  }
+  .screen.scrolly { overflow-y: auto; gap: 10px; }
+
+  /* ===== Status card (with topo rose watermark) ===== */
+  .status-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    border-radius: 18px;
+    padding: 14px 16px 14px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .status-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 14px; bottom: 14px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--success);
+  }
+  .status-card .rose-bg {
+    position: absolute;
+    right: -10px; top: -10px;
+    width: 90px; height: 90px;
+    opacity: 0.07;
+    pointer-events: none;
+  }
+  .status-card .sc-top {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .status-card .sc-fix {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 800;
+    color: var(--success);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .status-card .sc-fix .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 3px rgba(22,163,91,0.18);
+    position: relative;
+  }
+  .status-card .sc-fix .dot::after {
+    content: '';
+    position: absolute; inset: -6px;
+    border-radius: 50%;
+    border: 1px solid rgba(22,163,91,0.30);
+    animation: ping 2s infinite ease-out;
+  }
+  @keyframes ping {
+    0% { transform: scale(0.6); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .status-card .sc-meta {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-2);
+    letter-spacing: 0.02em;
+  }
+  .status-card .sc-project {
+    margin-top: 8px;
+    font-size: 14px; font-weight: 700;
+    color: var(--brand-deep);
+    letter-spacing: -0.005em;
+  }
+  .status-card .sc-coords-mini {
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 11px;
+    color: var(--text-2);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* ===== Pill metrics row ===== */
+  .pill-row { display: flex; gap: 8px; }
+  .pill-metric {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 10px 8px 9px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .pill-metric .label {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-3);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .pill-metric .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1.1;
+    margin-top: 3px;
+    letter-spacing: -0.01em;
+  }
+  .pill-metric.accent {
+    background: linear-gradient(180deg, var(--brand-soft) 0%, #EEF3FC 100%);
+    border-color: rgba(26,93,216,0.20);
+  }
+  .pill-metric.accent .value { color: var(--brand); }
+
+  /* ===== Grid of tiles (Home) ===== */
+  .grid-hero {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 10px;
+  }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 18px;
+    padding: 14px 12px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+    cursor: pointer;
+    position: relative;
+    min-height: 96px;
+    overflow: hidden;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .tile:hover { transform: translateY(-1px); border-color: var(--hairline-strong); }
+  .tile .tile-icon {
+    width: 38px; height: 38px;
+    border-radius: 12px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .tile .tile-icon .material-symbols-outlined { font-size: 22px; }
+  .tile .tile-label {
+    font-size: 13px; font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    margin-top: auto;
+  }
+  .tile .tile-badge {
+    position: absolute;
+    top: 11px; right: 11px;
+    padding: 2px 8px;
+    background: var(--brand-deep);
+    color: white;
+    border-radius: 999px;
+    font-size: 10px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+  /* hero tile */
+  .tile.hero {
+    grid-column: span 2;
+    grid-row: span 2;
+    background: linear-gradient(135deg, #1A5DD8 0%, #0E3F95 60%, #0E2A57 100%);
+    border: none;
+    padding: 18px 18px 18px;
+    justify-content: space-between;
+    color: white;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(26,93,216,0.28);
+  }
+  /* Topographic rings overlay */
+  .tile.hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 78% 28%, transparent 49.5%, rgba(255,255,255,0.10) 50%, transparent 50.7%),
+      radial-gradient(circle at 78% 28%, transparent 39.7%, rgba(255,255,255,0.08) 40%, transparent 40.7%),
+      radial-gradient(circle at 78% 28%, transparent 29.7%, rgba(255,255,255,0.06) 30%, transparent 30.7%),
+      radial-gradient(circle at 78% 28%, transparent 19.7%, rgba(255,255,255,0.05) 20%, transparent 20.7%);
+    pointer-events: none;
+  }
+  /* Cross marker top-right */
+  .tile.hero::after {
+    content: '';
+    position: absolute;
+    top: 24%; right: 14%;
+    width: 16px; height: 16px;
+    background-image:
+      linear-gradient(to bottom, transparent 7.5px, rgba(255,255,255,0.45) 7.5px, rgba(255,255,255,0.45) 8.5px, transparent 8.5px),
+      linear-gradient(to right, transparent 7.5px, rgba(255,255,255,0.45) 7.5px, rgba(255,255,255,0.45) 8.5px, transparent 8.5px);
+    pointer-events: none;
+  }
+  .tile.hero .tile-icon {
+    width: 54px; height: 54px;
+    border-radius: 16px;
+    background: var(--brand-soft);
+    color: var(--brand-deep);
+    box-shadow: 0 4px 14px rgba(14,42,87,0.20), inset 0 0 0 1px rgba(255,255,255,0.30);
+    position: relative; z-index: 1;
+  }
+  .tile.hero .tile-icon .material-symbols-outlined { font-size: 30px; }
+  .tile.hero .hero-body { position: relative; z-index: 1; }
+  .tile.hero .tile-label-big {
+    font-size: 24px; font-weight: 800;
+    line-height: 1.0;
+    letter-spacing: -0.022em;
+    color: white;
+  }
+  .tile.hero .tile-sub {
+    margin-top: 8px;
+    font-size: 10px; font-weight: 800;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255,255,255,0.72);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .tile.hero .tile-sub::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: white;
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+  }
+  /* accent (outlined) tiles — Линия / Вынос */
+  .tile.accent {
+    background: var(--brand-faint);
+    border: 1.5px solid var(--brand);
+  }
+  .tile.accent .tile-icon {
+    background: var(--brand);
+    color: var(--brand-soft);
+  }
+  .tile.accent .tile-label { color: var(--brand-deep); }
+  /* system tiles — Приёмник / NTRIP / Проекты — outlined вариант */
+  .tile.system {
+    background: var(--surface);
+    border-color: var(--hairline);
+  }
+  .tile.system .tile-icon {
+    background: transparent;
+    border: 1.5px solid var(--brand);
+    color: var(--brand);
+  }
+  .tile.system .tile-label { color: var(--brand-deep); }
+
+  /* ===== Bottom nav ===== */
+  .nav-bar {
+    height: 76px;
+    background: var(--surface);
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    padding: 8px 4px 16px;
+    flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .nav-item.active { color: var(--brand); }
+  .nav-item .icon-cap {
+    width: 56px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 16px;
+    transition: background 0.18s ease;
+  }
+  .nav-item.active .icon-cap {
+    background: var(--brand-soft);
+  }
+  .nav-item .icon-cap .material-symbols-outlined { font-size: 22px; }
+  .nav-item .nav-label { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+
+  /* ===== Stakeout compass ===== */
+  .compass-wrap {
+    display: flex; justify-content: center;
+    padding: 4px 0 2px;
+    position: relative;
+  }
+  .compass-wrap::before {
+    content: 'STAKEOUT · BEARING 47° 12′';
+    position: absolute;
+    top: -6px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px; font-weight: 800;
+    color: var(--text-3);
+    letter-spacing: 0.20em;
+    background: var(--surface);
+    padding: 0 8px;
+    z-index: 2;
+  }
+
+  /* Distance card */
+  .dist-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    border-radius: 16px;
+    padding: 14px 16px 12px 18px;
+    position: relative;
+  }
+  .dist-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 14px; bottom: 14px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--brand);
+  }
+  .dist-card .label {
+    font-size: 10px; font-weight: 800;
+    color: var(--text-3);
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .dist-card .big {
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 40px; font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1; letter-spacing: -0.025em;
+  }
+  .dist-card .big .unit {
+    font-size: 22px; color: var(--text-2);
+    font-weight: 500; margin-left: 5px;
+  }
+  .dist-card .divider {
+    height: 1px;
+    margin: 12px 0;
+    background-image: linear-gradient(to right, var(--hairline-strong) 50%, transparent 50%);
+    background-size: 6px 1px; background-repeat: repeat-x;
+  }
+  .dist-card .row-info {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--text-2);
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  .dist-card .row-info .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-weight: 700; color: var(--brand-deep);
+  }
+  .dist-card .row-info .val.accent { color: var(--brand); }
+
+  /* ===== Buttons ===== */
+  .btn-row { display: flex; gap: 10px; }
+  .btn {
+    flex: 1; height: 52px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 13px; font-weight: 800;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: transform 0.12s ease, box-shadow 0.18s ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--brand) 0%, #134EBC 100%);
+    color: white;
+    box-shadow: 0 4px 12px var(--brand-glow), inset 0 1px 0 rgba(255,255,255,0.20);
+  }
+  .btn-primary:hover { box-shadow: 0 6px 16px var(--brand-glow), inset 0 1px 0 rgba(255,255,255,0.20); }
+  .btn-outline {
+    background: var(--surface);
+    color: var(--brand-deep);
+    border: 1.5px solid var(--hairline-strong);
+  }
+  .btn .material-symbols-outlined { font-size: 18px; }
+
+  /* Full-width FAB */
+  .fab {
+    background: linear-gradient(180deg, var(--brand) 0%, #134EBC 100%);
+    color: white;
+    border-radius: 20px;
+    height: 60px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    font-size: 14px; font-weight: 800;
+    letter-spacing: 0.08em;
+    box-shadow: 0 8px 20px var(--brand-glow), inset 0 1px 0 rgba(255,255,255,0.20);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    position: relative;
+    overflow: hidden;
+  }
+  .fab .material-symbols-outlined { font-size: 24px; }
+  .fab::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), transparent);
+    pointer-events: none;
+  }
+
+  /* ===== Inline status pill ===== */
+  .inline-status {
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+  }
+  .inline-status .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 3px rgba(22,163,91,0.18);
+  }
+  .inline-status .sep { color: var(--text-3); margin: 0 4px; }
+  .inline-status .key { font-weight: 800; color: var(--success); letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
+
+  /* ===== Settings ===== */
+  .now-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px 7px 10px;
+    background: var(--brand-soft);
+    color: var(--brand-deep);
+    border-radius: 999px;
+    border: 1px solid rgba(26,93,216,0.30);
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.10em; text-transform: uppercase;
+    align-self: flex-start;
+  }
+  .now-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 0 3px rgba(26,93,216,0.22);
+  }
+
+  .section-label {
+    font-size: 10px; font-weight: 800;
+    color: var(--text-3);
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin: 8px 4px 2px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after {
+    content: ''; flex: 1; height: 1px;
+    background-image: linear-gradient(to right, var(--hairline-strong) 50%, transparent 50%);
+    background-size: 6px 1px; background-repeat: repeat-x;
+  }
+
+  .radio-group {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .radio-row {
+    padding: 13px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 14px; font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .radio-row:last-child { border-bottom: none; }
+  .radio-row.active {
+    background: linear-gradient(90deg, var(--brand-soft) 0%, #EEF3FC 100%);
+    color: var(--brand-deep);
+    font-weight: 700;
+  }
+  .radio-dot {
+    width: 20px; height: 20px;
+    border: 2px solid var(--hairline-strong);
+    border-radius: 50%;
+    position: relative; flex-shrink: 0;
+  }
+  .radio-row.active .radio-dot { border-color: var(--brand); }
+  .radio-row.active .radio-dot::after {
+    content: ''; position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--brand);
+  }
+
+  .list-tile {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .list-tile:hover { border-color: var(--hairline-strong); }
+  .list-tile .lt-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .list-tile .lt-icon.navy {
+    background: var(--brand-deep);
+    color: var(--brand-soft);
+  }
+  .list-tile .lt-body { flex: 1; min-width: 0; }
+  .list-tile .lt-title {
+    font-size: 14px; font-weight: 700; color: var(--brand-deep);
+  }
+  .list-tile .lt-sub {
+    font-size: 12px; color: var(--text-2);
+    font-weight: 500; margin-top: 2px;
+  }
+  .list-tile .lt-chev { color: var(--text-3); font-size: 22px !important; }
+
+  .switch-row {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 14px; font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .switch-row:last-child { border-bottom: none; }
+  .switch-row .label-text { flex: 1; }
+  .switch-row .ss-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    font-weight: 700;
+    margin-right: 4px;
+    letter-spacing: 0.04em;
+  }
+  .switch {
+    width: 42px; height: 24px;
+    background: var(--surface-deep);
+    border-radius: 12px;
+    position: relative; flex-shrink: 0;
+    border: 1px solid var(--hairline);
+    transition: background 0.18s ease;
+  }
+  .switch.on {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  .switch::after {
+    content: ''; position: absolute;
+    top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(14,42,87,0.22);
+    transition: left 0.18s ease;
+  }
+  .switch.on::after { left: 21px; }
+
+  .form-row {
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 14px; font-weight: 600;
+    color: var(--text);
+  }
+  .form-row .label-text { flex: 1; }
+  .form-row .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-weight: 700; color: var(--brand);
+    background: var(--brand-soft);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
+  /* Pending banner */
+  .pending-bar {
+    padding: 12px 18px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .pending-banner {
+    background: linear-gradient(135deg, #FFF6E0 0%, #FCEAB8 100%);
+    border-radius: 16px;
+    border-left: 4px solid var(--warning);
+    padding: 12px 12px 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .pending-banner .warn-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--warning);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pending-banner .warn-icon .material-symbols-outlined { font-size: 20px; }
+  .pending-banner .pb-body { flex: 1; min-width: 0; }
+  .pending-banner .pb-title {
+    font-size: 13px; font-weight: 800;
+    color: #7A4F00;
+    letter-spacing: 0.005em;
+  }
+  .pending-banner .pb-sub {
+    font-size: 11px; color: #A47100;
+    margin-top: 2px; font-weight: 500;
+  }
+  .pending-banner .pb-action {
+    padding: 9px 16px;
+    background: var(--warning);
+    color: white;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.10em;
+    border: none; cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+  }
+
+  /* ===== Survey screen ===== */
+  .text-field {
+    background: var(--surface);
+    border: 1.5px solid var(--brand);
+    border-radius: 14px;
+    padding: 8px 8px 8px 14px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 0 0 4px rgba(26,93,216,0.10);
+  }
+  .text-field .tf-body { flex: 1; min-width: 0; }
+  .text-field .tf-label {
+    font-size: 10px;
+    color: var(--brand);
+    font-weight: 800;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+  .text-field .tf-value {
+    font-size: 18px; font-weight: 700;
+    color: var(--brand-deep);
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.005em;
+  }
+
+  .progress-wrap {
+    display: flex; justify-content: center;
+    padding: 4px 0 2px;
+    position: relative;
+  }
+  .progress-ring { position: relative; }
+  .progress-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .progress-center .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 44px; font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1; letter-spacing: -0.04em;
+  }
+  .progress-center .num .of {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-left: 2px;
+  }
+  .progress-center .lbl {
+    font-size: 10px; font-weight: 800;
+    color: var(--text-3);
+    letter-spacing: 0.20em; text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .live-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    border-radius: 16px;
+    padding: 12px 16px;
+    position: relative;
+  }
+  .live-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 14px; bottom: 14px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--success);
+  }
+  .live-card .live-coord {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 14px; font-weight: 600;
+    line-height: 1.6;
+    color: var(--brand-deep);
+    display: flex; gap: 10px;
+    letter-spacing: -0.005em;
+  }
+  .live-card .live-coord .lbl {
+    color: var(--text-3);
+    font-weight: 700; width: 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+  }
+  .live-card .sigma {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--hairline-strong);
+    font-size: 11px;
+    color: var(--text-2);
+    font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .live-card .sigma .fix-mini {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-weight: 800;
+    color: var(--success);
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+  .live-card .sigma .fix-mini .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 3px rgba(22,163,91,0.18);
+  }
+
+  .mt-auto { margin-top: auto; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="brand-mark">
+    <span class="mark-dot"></span>
+    <span class="mark-text">Newton · Field Blue</span>
+  </div>
+  <h1>Newton Field App<br><span class="accent">— гибрид: Topo × Brand Blue</span></h1>
+  <p>Картографическая чистота, фирменный синий, монохромная палитра. Крупные числа под полевые условия, компас как фирменный якорь.</p>
+  <div class="tokens">
+    <span class="token"><span class="swatch" style="background:#1A5DD8;"></span>brand</span>
+    <span class="token"><span class="swatch" style="background:#0E2A57;"></span>brand-deep</span>
+    <span class="token"><span class="swatch" style="background:#4F7FCE;"></span>brand-mid</span>
+    <span class="token"><span class="swatch" style="background:#DCE7FB;"></span>brand-soft</span>
+    <span class="token"><span class="swatch" style="background:#16A35B;"></span>success</span>
+    <span class="token"><span class="swatch" style="background:#D08400;"></span>warning</span>
+  </div>
+</div>
+
+<div class="row">
+
+  <!-- ================== HOME / GRID ================== -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:47</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">menu</span></button>
+        <div class="title">Newton<small>«Newton N2-RTK» · подключён</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">more_vert</span></button>
+      </div>
+      <div class="screen">
+
+        <!-- Status card -->
+        <div class="status-card">
+          <svg class="rose-bg" viewBox="0 0 90 90">
+            <circle cx="45" cy="45" r="40" fill="none" stroke="#0E2A57" stroke-width="1"/>
+            <circle cx="45" cy="45" r="32" fill="none" stroke="#0E2A57" stroke-width="0.6" stroke-dasharray="2,2"/>
+            <circle cx="45" cy="45" r="24" fill="none" stroke="#0E2A57" stroke-width="0.4"/>
+            <polygon points="45,13 49,43 45,45 41,43" fill="#0E2A57"/>
+            <polygon points="45,77 49,47 45,45 41,47" fill="#0E2A57" opacity="0.4"/>
+            <text x="45" y="11" text-anchor="middle" font-family="Inter" font-size="6" font-weight="800" fill="#0E2A57">N</text>
+          </svg>
+          <div class="sc-top">
+            <div class="sc-fix"><span class="dot"></span>RTK Fix</div>
+            <div class="sc-meta">18 SAT · HDOP 0.8 · 1.2с</div>
+          </div>
+          <div class="sc-project">Объект «К-12 Север»</div>
+          <div class="sc-coords-mini">55°45′12.3456″ N · 37°37′02.7890″ E</div>
+        </div>
+
+        <!-- Pill metrics -->
+        <div class="pill-row">
+          <div class="pill-metric accent">
+            <div class="value">18</div>
+            <div class="label">SAT</div>
+          </div>
+          <div class="pill-metric">
+            <div class="value">0.8</div>
+            <div class="label">HDOP</div>
+          </div>
+          <div class="pill-metric">
+            <div class="value">8mm</div>
+            <div class="label">σ HRMS</div>
+          </div>
+        </div>
+
+        <!-- Tile grid -->
+        <div class="grid-hero">
+
+          <div class="tile hero">
+            <div class="tile-icon"><span class="material-symbols-outlined">add_location_alt</span></div>
+            <div class="hero-body">
+              <div class="tile-label-big">Снять<br>точку</div>
+              <div class="tile-sub">RTK · 30 эпох</div>
+            </div>
+          </div>
+
+          <div class="tile accent">
+            <div class="tile-icon"><span class="material-symbols-outlined">timeline</span></div>
+            <div class="tile-label">Линия</div>
+          </div>
+          <div class="tile accent">
+            <div class="tile-icon"><span class="material-symbols-outlined">flag</span></div>
+            <div class="tile-label">Вынос</div>
+          </div>
+
+          <div class="tile">
+            <div class="tile-icon"><span class="material-symbols-outlined">map</span></div>
+            <div class="tile-label">Карта</div>
+          </div>
+          <div class="tile">
+            <div class="tile-icon"><span class="material-symbols-outlined">apps</span></div>
+            <div class="tile-badge">142</div>
+            <div class="tile-label">Точки</div>
+          </div>
+          <div class="tile">
+            <div class="tile-icon"><span class="material-symbols-outlined">architecture</span></div>
+            <div class="tile-label">CAD · DXF</div>
+          </div>
+
+          <div class="tile system">
+            <div class="tile-icon"><span class="material-symbols-outlined">satellite_alt</span></div>
+            <div class="tile-label">Приёмник</div>
+          </div>
+          <div class="tile system">
+            <div class="tile-icon"><span class="material-symbols-outlined">cloud</span></div>
+            <div class="tile-label">NTRIP</div>
+          </div>
+          <div class="tile system">
+            <div class="tile-icon"><span class="material-symbols-outlined">folder_open</span></div>
+            <div class="tile-label">Проекты</div>
+          </div>
+
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active"><div class="icon-cap"><span class="material-symbols-outlined">home</span></div><div class="nav-label">Главная</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">map</span></div><div class="nav-label">Карта</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">apps</span></div><div class="nav-label">Точки</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">settings</span></div><div class="nav-label">Настройки</div></div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-001 · Главный</div>
+  </div>
+
+  <!-- ================== STAKEOUT ================== -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:51</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">Вынос точки<small>P-042 · допуск 50 мм</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div class="screen">
+
+        <!-- Big compass — фирменный visual anchor -->
+        <div class="compass-wrap">
+          <svg width="280" height="280" viewBox="0 0 280 280">
+            <defs>
+              <radialGradient id="bg-grad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#F7FAFD"/>
+                <stop offset="70%" stop-color="#FFFFFF"/>
+                <stop offset="100%" stop-color="#F0F4FA"/>
+              </radialGradient>
+              <linearGradient id="arrow-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#22D3EE"/>
+                <stop offset="100%" stop-color="#1A5DD8"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Background circle -->
+            <circle cx="140" cy="140" r="132" fill="url(#bg-grad)" stroke="#0E2A57" stroke-width="2"/>
+            <circle cx="140" cy="140" r="122" fill="none" stroke="#0E2A57" stroke-width="0.5"/>
+
+            <!-- Dashed inner rings -->
+            <circle cx="140" cy="140" r="100" fill="none" stroke="#0E2A57" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>
+            <circle cx="140" cy="140" r="70" fill="none" stroke="#0E2A57" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.30"/>
+
+            <!-- Cardinal tick marks (degrees) -->
+            <g stroke="#0E2A57" stroke-width="1.4" stroke-linecap="round">
+              <line x1="140" y1="8" x2="140" y2="22"/>
+              <line x1="140" y1="258" x2="140" y2="272" opacity="0.5"/>
+              <line x1="8" y1="140" x2="22" y2="140" opacity="0.5"/>
+              <line x1="258" y1="140" x2="272" y2="140" opacity="0.5"/>
+            </g>
+            <!-- 30/60° ticks -->
+            <g stroke="#0E2A57" stroke-width="1">
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(30 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(60 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(120 140 140)" opacity="0.5"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(150 140 140)" opacity="0.5"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(210 140 140)" opacity="0.5"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(240 140 140)" opacity="0.5"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(300 140 140)" opacity="0.5"/>
+              <line x1="140" y1="10" x2="140" y2="18" transform="rotate(330 140 140)" opacity="0.5"/>
+            </g>
+            <!-- Minor degree ticks (every 10°) -->
+            <g stroke="#0E2A57" stroke-width="0.4" opacity="0.4">
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(10 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(20 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(40 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(50 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(70 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(80 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(100 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(110 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(130 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(140 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(160 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(170 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(190 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(200 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(220 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(230 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(250 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(260 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(280 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(290 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(310 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(320 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(340 140 140)"/>
+              <line x1="140" y1="10" x2="140" y2="14" transform="rotate(350 140 140)"/>
+            </g>
+
+            <!-- Cardinal labels -->
+            <text x="140" y="38" text-anchor="middle" font-family="Inter" font-size="14" font-weight="900" fill="#0E2A57">N</text>
+            <text x="140" y="248" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#0E2A57" opacity="0.5">S</text>
+            <text x="38" y="145" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#0E2A57" opacity="0.5">W</text>
+            <text x="242" y="145" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#0E2A57" opacity="0.5">E</text>
+
+            <!-- Inner topographic decoration (compass rose 4-point shadow) -->
+            <g opacity="0.10">
+              <polygon points="140,45 145,138 140,140 135,138" fill="#0E2A57"/>
+              <polygon points="140,235 145,142 140,140 135,142" fill="#0E2A57"/>
+              <polygon points="45,140 138,145 140,140 138,135" fill="#0E2A57"/>
+              <polygon points="235,140 142,145 140,140 142,135" fill="#0E2A57"/>
+            </g>
+
+            <!-- Target circle (where the bearing leads) -->
+            <g transform="rotate(47 140 140)">
+              <!-- Faint target indicator at end -->
+              <circle cx="140" cy="38" r="14" fill="none" stroke="#0E2A57" stroke-width="1.2" stroke-dasharray="2,2" opacity="0.55"/>
+              <circle cx="140" cy="38" r="5" fill="#1A5DD8" opacity="0.22"/>
+              <circle cx="140" cy="38" r="3" fill="#1A5DD8"/>
+            </g>
+
+            <!-- Direction arrow at 47° (brand-mid → navy gradient) -->
+            <g transform="rotate(47 140 140)">
+              <polygon points="140,52 152,134 140,124 128,134"
+                       fill="url(#arrow-grad)"
+                       stroke="#0E2A57" stroke-width="1.2"
+                       stroke-linejoin="round"/>
+              <!-- South dim tail -->
+              <polygon points="140,228 144,148 140,146 136,148" fill="#0E2A57" opacity="0.35"/>
+            </g>
+
+            <!-- Center -->
+            <circle cx="140" cy="140" r="11" fill="white" stroke="#0E2A57" stroke-width="2"/>
+            <circle cx="140" cy="140" r="5" fill="#1A5DD8"/>
+            <circle cx="140" cy="140" r="2" fill="white"/>
+          </svg>
+        </div>
+
+        <!-- Distance -->
+        <div class="dist-card">
+          <div class="label">Расстояние до точки</div>
+          <div class="big">2.347<span class="unit">м</span></div>
+          <div class="divider"></div>
+          <div class="row-info"><span>Азимут</span><span class="val accent">47° 12′</span></div>
+          <div class="row-info"><span>Δ Z</span><span class="val">+0.018 м</span></div>
+        </div>
+
+        <!-- Status -->
+        <div class="inline-status">
+          <span class="dot"></span>
+          <span class="key">RTK Fix</span>
+          <span class="sep">·</span>
+          <span>17 SAT</span>
+          <span class="sep">·</span>
+          <span>HDOP 0.9</span>
+        </div>
+
+        <div class="mt-auto"></div>
+        <div class="btn-row">
+          <button class="btn btn-outline">
+            <span class="material-symbols-outlined">swap_horiz</span>
+            СМЕНИТЬ
+          </button>
+          <button class="btn btn-primary" style="flex: 1.4;">
+            <span class="material-symbols-outlined">push_pin</span>
+            ЗАФИКСИРОВАТЬ
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-040 · Stakeout</div>
+  </div>
+
+  <!-- ================== SURVEY (averaging) ================== -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:48</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">Съёмка точки<small>усреднение эпох · RTK</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">info</span></button>
+      </div>
+      <div class="screen">
+
+        <!-- Name field (focused) -->
+        <div class="text-field">
+          <div class="tf-body">
+            <div class="tf-label">Имя точки</div>
+            <div class="tf-value">P-007</div>
+          </div>
+          <button class="icon-btn"><span class="material-symbols-outlined">edit</span></button>
+        </div>
+
+        <!-- Progress ring -->
+        <div class="progress-wrap">
+          <div class="progress-ring">
+            <svg width="200" height="200" viewBox="0 0 200 200">
+              <defs>
+                <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#22D3EE"/>
+                  <stop offset="100%" stop-color="#1A5DD8"/>
+                </linearGradient>
+              </defs>
+              <!-- Topographic dashed outer guide -->
+              <circle cx="100" cy="100" r="94" fill="none" stroke="#0E2A57" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.25"/>
+              <!-- Track -->
+              <circle cx="100" cy="100" r="82" fill="none" stroke="#EFF3FA" stroke-width="12"/>
+              <!-- Progress -->
+              <circle cx="100" cy="100" r="82" fill="none" stroke="url(#ring-grad)" stroke-width="12"
+                      stroke-linecap="round"
+                      stroke-dasharray="515.22"
+                      stroke-dashoffset="274.78"
+                      transform="rotate(-90 100 100)"/>
+              <!-- Tick at top -->
+              <line x1="100" y1="8" x2="100" y2="18" stroke="#0E2A57" stroke-width="1.4"/>
+              <line x1="100" y1="182" x2="100" y2="192" stroke="#0E2A57" stroke-width="0.8" opacity="0.5"/>
+              <line x1="8" y1="100" x2="18" y2="100" stroke="#0E2A57" stroke-width="0.8" opacity="0.5"/>
+              <line x1="182" y1="100" x2="192" y2="100" stroke="#0E2A57" stroke-width="0.8" opacity="0.5"/>
+            </svg>
+            <div class="progress-center">
+              <div class="num">14<span class="of">/30</span></div>
+              <div class="lbl">эпох</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live coords -->
+        <div class="live-card">
+          <div class="live-coord"><span class="lbl">N</span>55°45′12.347″</div>
+          <div class="live-coord"><span class="lbl">E</span>37°37′02.789″</div>
+          <div class="live-coord"><span class="lbl">H</span>187.231 m</div>
+          <div class="sigma">
+            <span>σ 11 / 16 mm · HRMS / VRMS</span>
+            <span class="fix-mini"><span class="dot"></span>RTK Fix</span>
+          </div>
+        </div>
+
+        <!-- Form rows -->
+        <div class="form-row">
+          <span class="label-text">Высота антенны</span>
+          <span class="value">2.000 m</span>
+        </div>
+        <div class="form-row">
+          <span class="label-text">Код точки</span>
+          <span class="value">B-EDGE</span>
+        </div>
+
+        <div class="mt-auto"></div>
+        <div class="btn-row">
+          <button class="btn btn-outline">
+            <span class="material-symbols-outlined">close</span>
+            ОТМЕНА
+          </button>
+          <button class="btn btn-primary" style="flex: 1.4;">
+            <span class="material-symbols-outlined">check</span>
+            СОХРАНИТЬ
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-010 · Съёмка</div>
+  </div>
+
+  <!-- ================== SETTINGS ================== -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:55</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">Приёмник<small>«Newton N2-RTK» · в работе</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">help_outline</span></button>
+      </div>
+      <div class="screen scrolly">
+        <span class="now-pill"><span class="dot"></span>Активно · Rover / NTRIP</span>
+
+        <div class="section-label">Режим работы</div>
+        <div class="radio-group">
+          <div class="radio-row active"><span class="radio-dot"></span>Rover</div>
+          <div class="radio-row"><span class="radio-dot"></span>Base</div>
+          <div class="radio-row"><span class="radio-dot"></span>Static (PPK)</div>
+        </div>
+
+        <div class="section-label">Источник поправок</div>
+        <div class="list-tile">
+          <div class="lt-icon"><span class="material-symbols-outlined">cloud_download</span></div>
+          <div class="lt-body">
+            <div class="lt-title">NTRIP · «РИВНЕ-Н»</div>
+            <div class="lt-sub">caster.example.ru · mount MAX</div>
+          </div>
+          <span class="material-symbols-outlined lt-chev">chevron_right</span>
+        </div>
+
+        <div class="section-label">Спутниковые системы</div>
+        <div class="radio-group">
+          <div class="switch-row">
+            <span class="label-text">GPS</span>
+            <span class="ss-meta">8</span>
+            <span class="switch on"></span>
+          </div>
+          <div class="switch-row">
+            <span class="label-text">GLONASS</span>
+            <span class="ss-meta">6</span>
+            <span class="switch on"></span>
+          </div>
+          <div class="switch-row">
+            <span class="label-text">Galileo</span>
+            <span class="ss-meta">4</span>
+            <span class="switch on"></span>
+          </div>
+          <div class="switch-row">
+            <span class="label-text">BeiDou</span>
+            <span class="ss-meta">—</span>
+            <span class="switch"></span>
+          </div>
+        </div>
+
+        <div class="section-label">Маски наблюдения</div>
+        <div class="form-row">
+          <span class="label-text">Угол возвышения</span>
+          <span class="value">15°</span>
+        </div>
+        <div class="form-row">
+          <span class="label-text">Минимум SNR</span>
+          <span class="value">35 дБ</span>
+        </div>
+
+        <div class="section-label">Антенна</div>
+        <div class="list-tile">
+          <div class="lt-icon navy"><span class="material-symbols-outlined">straighten</span></div>
+          <div class="lt-body">
+            <div class="lt-title">Newton N2 · Pole</div>
+            <div class="lt-sub">2.000 м · фаз. центр −0.018 м</div>
+          </div>
+          <span class="material-symbols-outlined lt-chev">chevron_right</span>
+        </div>
+      </div>
+
+      <div class="pending-bar">
+        <div class="pending-banner">
+          <div class="warn-icon"><span class="material-symbols-outlined">priority_high</span></div>
+          <div class="pb-body">
+            <div class="pb-title">3 несохранённых изменения</div>
+            <div class="pb-sub">Применятся после «Сохранить»</div>
+          </div>
+          <button class="pb-action">ПРИМЕНИТЬ</button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SET-010 · Приёмник</div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -9,13 +9,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.foundation.layout.PaddingValues
+import ru.newton.fieldapp.core.ui.components.NewtonCard
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -23,7 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.gnss.ntrip.NtripProfile
 import ru.newton.fieldapp.gnss.ntrip.NtripState
@@ -91,14 +92,18 @@ private fun CorrectionSourceContent(
             }
 
             if (state.activeProfileId != null) {
-                OutlinedButton(onClick = onDisable, modifier = Modifier.fillMaxWidth()) {
-                    Text("Отключить NTRIP")
-                }
+                NewtonSecondaryButton(
+                    onClick = onDisable,
+                    text = "Отключить NTRIP",
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
-            OutlinedButton(onClick = onManageProfiles, modifier = Modifier.fillMaxWidth()) {
-                Text("Управление профилями…")
-            }
+            NewtonSecondaryButton(
+                onClick = onManageProfiles,
+                text = "Управление профилями…",
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -120,8 +125,8 @@ private fun NtripStatusCard(state: NtripState) {
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Text(text, modifier = Modifier.padding(12.dp), color = color)
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Text(text, color = color)
     }
 }
 
@@ -131,8 +136,8 @@ private fun ProfileCard(
     isActive: Boolean,
     onSelect: () -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(profile.name, style = MaterialTheme.typography.titleMedium)
             Text(
                 "${profile.host}:${profile.port}/${profile.mountpoint}",
@@ -146,7 +151,7 @@ private fun ProfileCard(
                     color = MaterialTheme.colorScheme.primary,
                 )
             } else {
-                Button(onClick = onSelect) { Text("Выбрать") }
+                NewtonPrimaryButton(onClick = onSelect, text = "Выбрать")
             }
         }
     }

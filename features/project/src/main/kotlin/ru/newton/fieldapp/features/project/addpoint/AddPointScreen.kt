@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.theme.NewtonTheme
 
@@ -148,18 +149,19 @@ private fun AddPointContent(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Button(onClick = onAcknowledgeFailure) { Text("Попробовать ещё") }
+                NewtonSecondaryButton(
+                    onClick = onAcknowledgeFailure,
+                    text = "Попробовать ещё",
+                )
             }
 
             if (failed == null) {
-                Button(
+                NewtonPrimaryButton(
                     onClick = onSave,
+                    text = if (isSaving) "Сохранение…" else "Сохранить",
                     enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (isSaving) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                    Text(if (isSaving) "Сохранение…" else "Сохранить")
-                }
+                )
             }
         }
     }

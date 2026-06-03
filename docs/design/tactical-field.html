@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newton — Tactical Field</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&family=Roboto+Condensed:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A1A33;
+    --surface: #102542;
+    --surface-2: #15315A;
+    --surface-3: #1B3D6E;
+    --primary: #00D9FF;
+    --primary-dim: #0090BB;
+    --primary-glow: rgba(0,217,255,0.45);
+    --success: #00FF88;
+    --warning: #FFB300;
+    --error: #FF3D5A;
+    --text: #FFFFFF;
+    --text-dim: rgba(255,255,255,0.62);
+    --text-very-dim: rgba(255,255,255,0.38);
+    --hairline: rgba(0,217,255,0.20);
+    --hairline-strong: rgba(0,217,255,0.55);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Roboto Mono', monospace;
+    background: radial-gradient(ellipse at 40% 0%, #122348 0%, #050b18 70%);
+    min-height: 100vh;
+    padding: 56px 32px 80px;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal; font-style: normal;
+    font-size: 22px; line-height: 1;
+    display: inline-block; white-space: nowrap; direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  .page-header { text-align: center; margin-bottom: 48px; }
+  .page-header h1 {
+    font-family: 'Roboto Condensed', sans-serif;
+    font-weight: 800; font-size: 30px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--primary);
+    text-shadow: 0 0 12px var(--primary-glow);
+  }
+  .page-header p {
+    margin-top: 10px; color: var(--text-dim);
+    font-size: 12px; letter-spacing: 0.06em;
+  }
+  .page-header .tokens {
+    margin-top: 14px; display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  }
+  .token {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--hairline);
+    color: var(--text-dim);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  }
+  .token .swatch { width: 12px; height: 12px; border: 1px solid rgba(255,255,255,0.2); }
+
+  .row { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .phone-label {
+    color: var(--primary); opacity: 0.85;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .phone-label::before { content: '> '; color: var(--text-dim); }
+
+  .phone {
+    width: 380px; height: 800px;
+    background: var(--bg);
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+    border: 4px solid #03070f;
+    box-shadow:
+      0 40px 80px rgba(0,0,0,0.55),
+      0 16px 32px rgba(0,0,0,0.4),
+      inset 0 0 0 1px rgba(0,217,255,0.18),
+      inset 0 0 60px rgba(0,217,255,0.04);
+  }
+
+  .status-bar {
+    height: 32px; padding: 6px 24px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; font-weight: 700;
+    color: var(--text-dim); letter-spacing: 0.06em;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+  .status-bar .material-symbols-outlined { font-size: 14px; }
+
+  .top-bar { height: 52px; padding: 0 12px; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .icon-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; background: transparent;
+    border: 1px solid transparent; color: var(--text); cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--surface); border-color: var(--hairline); }
+  .top-bar .title {
+    flex: 1; text-align: center;
+    font-family: 'Roboto Condensed';
+    font-size: 13px; font-weight: 800;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--primary);
+  }
+  .top-bar .title small {
+    display: block;
+    font-family: 'Roboto Mono';
+    font-size: 10px; font-weight: 500;
+    color: var(--text-dim);
+    margin-top: 3px; letter-spacing: 0.04em;
+    text-transform: none;
+  }
+
+  .screen { flex: 1; padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+  /* HUD card with corner brackets */
+  .hud-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    padding: 14px 16px;
+    position: relative;
+  }
+  .hud-card .bracket {
+    position: absolute; width: 10px; height: 10px;
+    border: 2px solid var(--primary);
+    box-shadow: 0 0 6px var(--primary-glow);
+  }
+  .hud-card .bracket.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+  .hud-card .bracket.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+  .hud-card .bracket.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+  .hud-card .bracket.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+
+  /* status hud */
+  .status-hud {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 800;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .status-hud .fix {
+    color: var(--success);
+    text-shadow: 0 0 6px rgba(0,255,136,0.5);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .status-hud .fix .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success), 0 0 16px rgba(0,255,136,0.4);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .status-hud .meta { color: var(--text-dim); margin-left: auto; }
+  .status-hud .sep { color: var(--text-very-dim); margin: 0 6px; }
+  .status-hud .project {
+    margin-top: 8px;
+    font-family: 'Roboto Condensed';
+    font-size: 14px; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: none;
+    color: var(--text);
+  }
+
+  /* Tactical tiles grid */
+  .grid-hero {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 8px;
+  }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    padding: 12px 12px 10px;
+    display: flex; flex-direction: column; gap: 8px;
+    cursor: pointer;
+    position: relative;
+    min-height: 96px;
+  }
+  .tile::after {
+    content: ''; position: absolute;
+    top: -1px; right: -1px;
+    width: 8px; height: 8px;
+    border-top: 1px solid var(--primary);
+    border-right: 1px solid var(--primary);
+  }
+  .tile .tile-icon {
+    width: 38px; height: 38px;
+    background: rgba(0,217,255,0.10);
+    border: 1px solid var(--hairline-strong);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .tile .tile-icon .material-symbols-outlined { font-size: 22px; }
+  .tile .tile-label {
+    font-family: 'Roboto Condensed';
+    font-size: 12px; font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin-top: auto;
+  }
+  .tile .tile-badge {
+    position: absolute;
+    top: 8px; right: 14px;
+    padding: 1px 8px;
+    background: var(--primary);
+    color: #001828;
+    font-family: 'Roboto Mono';
+    font-size: 10px; font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .tile.hero {
+    grid-column: span 2; grid-row: span 2;
+    background: linear-gradient(135deg, rgba(0,217,255,0.18) 0%, rgba(16,37,66,0.4) 100%);
+    border: 1px solid var(--primary);
+    box-shadow: 0 0 24px rgba(0,217,255,0.15), inset 0 0 30px rgba(0,217,255,0.05);
+    padding: 18px;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .tile.hero::before {
+    content: '01';
+    position: absolute;
+    top: 12px; right: 16px;
+    font-family: 'Roboto Mono';
+    font-size: 10px; font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 0.2em;
+    opacity: 0.6;
+  }
+  .tile.hero .tile-icon {
+    width: 52px; height: 52px;
+    background: var(--primary);
+    color: #001828;
+    border: none;
+    box-shadow: 0 0 20px var(--primary-glow);
+  }
+  .tile.hero .tile-icon .material-symbols-outlined { font-size: 30px; }
+  .tile.hero .hero-body { position: relative; z-index: 1; }
+  .tile.hero .tile-label-big {
+    font-family: 'Roboto Condensed';
+    font-size: 22px; font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--primary);
+    text-shadow: 0 0 8px var(--primary-glow);
+  }
+  .tile.hero .tile-sub {
+    margin-top: 4px;
+    font-family: 'Roboto Mono';
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .tile.dim { background: var(--surface-2); }
+
+  /* Stakeout — compass HUD */
+  .compass-tac {
+    width: 260px; height: 260px;
+    margin: 0 auto;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    box-shadow: 0 0 30px rgba(0,217,255,0.25), inset 0 0 40px rgba(0,217,255,0.06);
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle, var(--surface) 0%, var(--bg) 80%);
+  }
+  .compass-tac::before {
+    content: ''; position: absolute;
+    inset: 16px;
+    border-radius: 50%;
+    border: 1px dashed var(--hairline-strong);
+  }
+  .compass-tac .ring-ticks {
+    position: absolute; inset: 0;
+    background-image:
+      conic-gradient(from 0deg,
+        var(--primary) 0deg, transparent 0.6deg, transparent 30deg,
+        var(--primary) 30deg, transparent 30.6deg, transparent 60deg,
+        var(--primary) 60deg, transparent 60.6deg, transparent 90deg,
+        var(--primary) 90deg, transparent 90.6deg, transparent 120deg,
+        var(--primary) 120deg, transparent 120.6deg, transparent 150deg,
+        var(--primary) 150deg, transparent 150.6deg, transparent 180deg,
+        var(--primary) 180deg, transparent 180.6deg, transparent 210deg,
+        var(--primary) 210deg, transparent 210.6deg, transparent 240deg,
+        var(--primary) 240deg, transparent 240.6deg, transparent 270deg,
+        var(--primary) 270deg, transparent 270.6deg, transparent 300deg,
+        var(--primary) 300deg, transparent 300.6deg, transparent 330deg,
+        var(--primary) 330deg, transparent 330.6deg, transparent 360deg);
+    border-radius: 50%;
+    mask: radial-gradient(circle, transparent 116px, black 117px, black 124px, transparent 125px);
+    -webkit-mask: radial-gradient(circle, transparent 116px, black 117px, black 124px, transparent 125px);
+    opacity: 0.5;
+  }
+  .compass-tac .label-n {
+    position: absolute; top: 28px;
+    font-family: 'Roboto Condensed';
+    font-size: 11px; font-weight: 800; color: var(--primary);
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 6px var(--primary-glow);
+  }
+  .arrow-tac {
+    position: absolute;
+    width: 4px; height: 86px;
+    background: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+    bottom: 50%; left: 50%;
+    margin-left: -2px;
+    transform-origin: bottom center;
+    transform: rotate(47deg);
+  }
+  .arrow-tac::before {
+    content: ''; position: absolute;
+    top: -16px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-bottom: 20px solid var(--primary);
+    filter: drop-shadow(0 0 6px var(--primary-glow));
+  }
+  .center-dot-tac {
+    width: 18px; height: 18px;
+    background: #001828;
+    border: 2px solid var(--primary);
+    border-radius: 50%;
+    z-index: 3;
+    box-shadow: 0 0 10px var(--primary-glow);
+  }
+
+  .dist-tac {
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    padding: 16px 18px;
+    position: relative;
+  }
+  .dist-tac .label {
+    font-size: 10px; font-weight: 800; color: var(--text-dim);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .dist-tac .big {
+    margin-top: 4px;
+    font-family: 'Roboto Mono';
+    font-feature-settings: 'tnum' 1;
+    font-size: 40px; font-weight: 700;
+    color: var(--primary);
+    text-shadow: 0 0 10px var(--primary-glow);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .dist-tac .big .unit {
+    font-size: 22px; color: var(--text-dim);
+    text-shadow: none; margin-left: 4px;
+  }
+  .dist-tac .divider {
+    height: 1px; background: var(--hairline);
+    margin: 12px 0;
+  }
+  .dist-tac .row-info {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-dim);
+    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    margin-top: 5px;
+  }
+  .dist-tac .row-info .val {
+    font-family: 'Roboto Mono';
+    font-weight: 700; color: var(--primary);
+    text-shadow: 0 0 4px var(--primary-glow);
+    text-transform: none; letter-spacing: 0;
+  }
+
+  /* tactical buttons */
+  .btn-row { display: flex; gap: 8px; }
+  .btn-tac {
+    flex: 1; height: 50px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: 'Roboto Condensed';
+    font-size: 12px; font-weight: 800;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; border-radius: 0;
+  }
+  .btn-tac.primary {
+    background: var(--primary); color: #001828;
+    border: 1px solid var(--primary);
+    box-shadow: 0 0 16px var(--primary-glow);
+  }
+  .btn-tac.outline {
+    background: transparent; color: var(--primary);
+    border: 1px solid var(--hairline-strong);
+  }
+  .btn-tac.tonal {
+    background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--hairline);
+  }
+  .btn-tac .material-symbols-outlined { font-size: 18px; }
+
+  /* Settings tac */
+  .now-pill-tac {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    background: rgba(0,217,255,0.06);
+    font-family: 'Roboto Condensed';
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    align-self: flex-start;
+    box-shadow: 0 0 12px rgba(0,217,255,0.15);
+  }
+  .now-pill-tac .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 6px var(--primary);
+  }
+  .section-label-tac {
+    font-family: 'Roboto Condensed';
+    font-size: 10px; font-weight: 800;
+    color: var(--text-dim);
+    letter-spacing: 0.24em; text-transform: uppercase;
+    margin: 4px 0 2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label-tac::after {
+    content: ''; flex: 1; height: 1px; background: var(--hairline);
+  }
+  .radio-group-tac {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+  }
+  .radio-row-tac {
+    padding: 11px 14px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--hairline);
+    font-family: 'Roboto Condensed';
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text);
+  }
+  .radio-row-tac:last-child { border-bottom: none; }
+  .radio-row-tac.active {
+    background: rgba(0,217,255,0.08);
+    color: var(--primary);
+    font-weight: 800;
+  }
+  .radio-dot-tac {
+    width: 16px; height: 16px;
+    border: 1px solid var(--hairline-strong);
+    position: relative; flex-shrink: 0;
+  }
+  .radio-row-tac.active .radio-dot-tac {
+    border-color: var(--primary);
+    box-shadow: 0 0 6px var(--primary-glow);
+  }
+  .radio-row-tac.active .radio-dot-tac::after {
+    content: ''; position: absolute;
+    inset: 3px; background: var(--primary);
+  }
+  .list-tile-tac {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .list-tile-tac .lt-icon {
+    width: 36px; height: 36px;
+    border: 1px solid var(--hairline-strong);
+    background: rgba(0,217,255,0.08);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .list-tile-tac .lt-body { flex: 1; min-width: 0; }
+  .list-tile-tac .lt-title {
+    font-family: 'Roboto Condensed';
+    font-size: 13px; font-weight: 700; color: var(--text);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .list-tile-tac .lt-sub {
+    font-size: 11px; color: var(--text-dim);
+    font-weight: 500; margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+  .switch-tac-row {
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--hairline);
+    font-family: 'Roboto Condensed';
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text);
+  }
+  .switch-tac-row:last-child { border-bottom: none; }
+  .switch-tac-row .label-text { flex: 1; }
+  .switch-tac {
+    width: 44px; height: 22px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline-strong);
+    position: relative; flex-shrink: 0;
+  }
+  .switch-tac.on { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px var(--primary-glow); }
+  .switch-tac::after {
+    content: ''; position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: var(--text-dim);
+  }
+  .switch-tac.on::after { left: 22px; background: #001828; }
+  .form-row-tac {
+    padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Roboto Condensed';
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text);
+  }
+  .form-row-tac .label-text { flex: 1; }
+  .form-row-tac .value {
+    font-family: 'Roboto Mono';
+    font-feature-settings: 'tnum' 1;
+    font-weight: 700; color: var(--primary);
+    text-shadow: 0 0 4px var(--primary-glow);
+    padding: 3px 10px;
+    border: 1px solid var(--hairline-strong);
+    font-size: 12px; letter-spacing: 0; text-transform: none;
+  }
+  .pending-tac {
+    padding: 12px 16px 14px;
+    background: var(--bg);
+    border-top: 1px solid var(--hairline-strong);
+    flex-shrink: 0;
+  }
+  .pending-banner-tac {
+    background: rgba(255,179,0,0.08);
+    border: 1px solid var(--warning);
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 0 16px rgba(255,179,0,0.15);
+  }
+  .pending-banner-tac .warn {
+    width: 32px; height: 32px;
+    background: var(--warning); color: #1a0f00;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pending-banner-tac .warn .material-symbols-outlined { font-size: 20px; }
+  .pending-banner-tac .pb-body { flex: 1; min-width: 0; }
+  .pending-banner-tac .pb-title {
+    font-family: 'Roboto Condensed';
+    font-size: 12px; font-weight: 800;
+    color: var(--warning);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .pending-banner-tac .pb-sub {
+    font-size: 10px; color: var(--text-dim);
+    margin-top: 2px; letter-spacing: 0.04em;
+  }
+  .pending-banner-tac .pb-action {
+    padding: 8px 14px;
+    background: var(--warning); color: #1a0f00;
+    border: none;
+    font-family: 'Roboto Condensed';
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(255,179,0,0.4);
+  }
+
+  /* nav */
+  .nav-bar {
+    height: 64px;
+    background: var(--surface);
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    padding: 6px 4px 10px;
+    flex-shrink: 0;
+  }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--text-dim); cursor: pointer; }
+  .nav-item.active { color: var(--primary); }
+  .nav-item .icon-cap { width: 48px; height: 24px; display: flex; align-items: center; justify-content: center; }
+  .nav-item.active .icon-cap { box-shadow: 0 0 8px var(--primary-glow); }
+  .nav-item .nav-label {
+    font-family: 'Roboto Condensed';
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .nav-item .icon-cap .material-symbols-outlined { font-size: 20px; }
+
+  .mt-auto { margin-top: auto; }
+  .scrolly { overflow-y: auto; gap: 10px !important; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>NEWTON · TACTICAL FIELD</h1>
+  <p>HUD-эстетика — тёмный navy, electric cyan glow, monospace, угловые скобки</p>
+  <div class="tokens">
+    <span class="token"><span class="swatch" style="background:#00D9FF;"></span>primary</span>
+    <span class="token"><span class="swatch" style="background:#102542;"></span>surface</span>
+    <span class="token"><span class="swatch" style="background:#00FF88;"></span>success</span>
+    <span class="token"><span class="swatch" style="background:#FFB300;"></span>warning</span>
+    <span class="token"><span class="swatch" style="background:#FF3D5A;"></span>error</span>
+  </div>
+</div>
+
+<div class="row">
+
+  <!-- HOME GRID -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:47</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">menu</span></button>
+        <div class="title">NEWTON<small>NODE: N2-RTK · ONLINE</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">more_vert</span></button>
+      </div>
+      <div class="screen">
+        <div class="hud-card">
+          <span class="bracket tl"></span><span class="bracket tr"></span>
+          <span class="bracket bl"></span><span class="bracket br"></span>
+          <div class="status-hud">
+            <span class="fix"><span class="dot"></span>RTK FIX</span>
+            <span class="meta">18 SAT<span class="sep">/</span>HDOP 0.8<span class="sep">/</span>1.2s</span>
+          </div>
+          <div class="project" style="margin-top: 8px; font-family: 'Roboto Condensed'; font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: 0.04em;">// ОБЪЕКТ К-12 СЕВЕР</div>
+        </div>
+
+        <div class="grid-hero">
+          <div class="tile hero">
+            <div class="tile-icon"><span class="material-symbols-outlined">add_location_alt</span></div>
+            <div class="hero-body">
+              <div class="tile-label-big">СНЯТЬ<br>ТОЧКУ</div>
+              <div class="tile-sub">RTK · 30 EPOCHS</div>
+            </div>
+          </div>
+          <div class="tile">
+            <div class="tile-icon"><span class="material-symbols-outlined">timeline</span></div>
+            <div class="tile-label">ЛИНИЯ</div>
+          </div>
+          <div class="tile">
+            <div class="tile-icon"><span class="material-symbols-outlined">flag</span></div>
+            <div class="tile-label">ВЫНОС</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">map</span></div>
+            <div class="tile-label">КАРТА</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">apps</span></div>
+            <div class="tile-badge">142</div>
+            <div class="tile-label">ТОЧКИ</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">architecture</span></div>
+            <div class="tile-label">CAD/DXF</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">satellite_alt</span></div>
+            <div class="tile-label">RX</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">cloud</span></div>
+            <div class="tile-label">NTRIP</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">folder_open</span></div>
+            <div class="tile-label">ПРОЕКТЫ</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active"><div class="icon-cap"><span class="material-symbols-outlined">home</span></div><div class="nav-label">HOME</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">map</span></div><div class="nav-label">MAP</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">apps</span></div><div class="nav-label">PTS</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">settings</span></div><div class="nav-label">CFG</div></div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-001 / HOME</div>
+  </div>
+
+  <!-- STAKEOUT -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:51</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">STAKEOUT<small>TARGET P-042 · TOL 50mm</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div class="screen">
+        <div class="compass-tac">
+          <div class="ring-ticks"></div>
+          <div class="label-n">N</div>
+          <div class="arrow-tac"></div>
+          <div class="center-dot-tac"></div>
+        </div>
+        <div class="dist-tac">
+          <div class="label">DISTANCE</div>
+          <div class="big">2.347<span class="unit">m</span></div>
+          <div class="divider"></div>
+          <div class="row-info"><span>Azimuth</span><span class="val">47° 12′</span></div>
+          <div class="row-info"><span>ΔZ</span><span class="val">+0.018 m</span></div>
+        </div>
+        <div class="hud-card" style="padding: 10px 14px;">
+          <span class="bracket tl"></span><span class="bracket br"></span>
+          <div class="status-hud">
+            <span class="fix"><span class="dot"></span>RTK FIX</span>
+            <span class="meta">17 SAT<span class="sep">/</span>HDOP 0.9</span>
+          </div>
+        </div>
+        <div class="mt-auto"></div>
+        <div class="btn-row">
+          <button class="btn-tac outline">
+            <span class="material-symbols-outlined">swap_horiz</span>
+            SWAP
+          </button>
+          <button class="btn-tac primary" style="flex: 1.4;">
+            <span class="material-symbols-outlined">push_pin</span>
+            LOCK
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-040 / STAKEOUT</div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:55</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">RX CONFIG<small>NEWTON N2-RTK · LINK OK</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">help_outline</span></button>
+      </div>
+      <div class="screen scrolly">
+        <span class="now-pill-tac"><span class="dot"></span>MODE: ROVER / NTRIP</span>
+
+        <div class="section-label-tac">режим работы</div>
+        <div class="radio-group-tac">
+          <div class="radio-row-tac active"><span class="radio-dot-tac"></span>Rover</div>
+          <div class="radio-row-tac"><span class="radio-dot-tac"></span>Base</div>
+          <div class="radio-row-tac"><span class="radio-dot-tac"></span>Static (PPK)</div>
+        </div>
+
+        <div class="section-label-tac">источник поправок</div>
+        <div class="list-tile-tac">
+          <div class="lt-icon"><span class="material-symbols-outlined">cloud_download</span></div>
+          <div class="lt-body">
+            <div class="lt-title">NTRIP / «РИВНЕ-Н»</div>
+            <div class="lt-sub">caster.example.ru · MAX</div>
+          </div>
+          <span class="material-symbols-outlined" style="color: var(--text-very-dim);">chevron_right</span>
+        </div>
+
+        <div class="section-label-tac">GNSS системы</div>
+        <div class="radio-group-tac">
+          <div class="switch-tac-row"><span class="label-text">GPS</span><span class="switch-tac on"></span></div>
+          <div class="switch-tac-row"><span class="label-text">GLONASS</span><span class="switch-tac on"></span></div>
+          <div class="switch-tac-row"><span class="label-text">Galileo</span><span class="switch-tac on"></span></div>
+          <div class="switch-tac-row"><span class="label-text">BeiDou</span><span class="switch-tac"></span></div>
+        </div>
+
+        <div class="section-label-tac">маски наблюдения</div>
+        <div class="form-row-tac">
+          <span class="label-text">Угол возвышения</span>
+          <span class="value">15°</span>
+        </div>
+        <div class="form-row-tac">
+          <span class="label-text">Min SNR</span>
+          <span class="value">35 dB</span>
+        </div>
+      </div>
+
+      <div class="pending-tac">
+        <div class="pending-banner-tac">
+          <div class="warn"><span class="material-symbols-outlined">priority_high</span></div>
+          <div class="pb-body">
+            <div class="pb-title">3 UNSAVED CHANGES</div>
+            <div class="pb-sub">system save required</div>
+          </div>
+          <button class="pb-action">APPLY</button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SET-010 / RX CONFIG</div>
+  </div>
+
+</div>
+
+</body>
+</html>

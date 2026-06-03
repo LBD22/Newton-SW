@@ -12,9 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.PaddingValues
+import ru.newton.fieldapp.core.ui.components.NewtonCard
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -279,9 +280,11 @@ private fun DxfImportContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
-            Button(onClick = onPickFile, modifier = Modifier.fillMaxWidth()) {
-                Text(if (state is DxfImportState.Idle) "Выбрать DXF…" else "Выбрать другой DXF…")
-            }
+            NewtonPrimaryButton(
+                onClick = onPickFile,
+                text = if (state is DxfImportState.Idle) "Выбрать DXF…" else "Выбрать другой DXF…",
+                modifier = Modifier.fillMaxWidth(),
+            )
             when (state) {
                 DxfImportState.Idle -> Unit
                 DxfImportState.Working -> Text("Обработка…", style = MaterialTheme.typography.titleMedium)
@@ -292,16 +295,21 @@ private fun DxfImportContent(
                     onSelectNone = onSelectNone,
                     onImport = onImportSelected,
                 )
-                is DxfImportState.Done -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                is DxfImportState.Done -> NewtonCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(12.dp),
+                ) {
+                    Column {
                         Text(
                             "Сохранено точек: ${state.saved} из ${state.entities} сущностей.",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                        Button(onClick = onReset, modifier = Modifier.padding(top = 8.dp)) {
-                            Text("Импортировать ещё")
-                        }
+                        NewtonPrimaryButton(
+                            onClick = onReset,
+                            text = "Импортировать ещё",
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
                     }
                 }
                 is DxfImportState.Failed -> Text(
@@ -329,8 +337,8 @@ private fun LayerPicker(
     onSelectNone: () -> Unit,
     onImport: () -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "Слои в файле (${state.layers.size}). Снимите галочку, чтобы " +
                     "пропустить слой.",
@@ -361,13 +369,12 @@ private fun LayerPicker(
                     }
                 }
             }
-            Button(
+            NewtonPrimaryButton(
                 onClick = onImport,
+                text = "Импортировать выбранные (${state.selected.size})",
                 enabled = state.selected.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Импортировать выбранные (${state.selected.size})")
-            }
+            )
         }
     }
 }

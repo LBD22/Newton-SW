@@ -1,12 +1,16 @@
 package ru.newton.fieldapp.features.survey.nav
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Architecture
 import androidx.compose.material.icons.filled.GpsFixed
@@ -33,6 +37,10 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
+import ru.newton.fieldapp.core.ui.components.TileAccent
+import ru.newton.fieldapp.core.ui.components.TileData
+import ru.newton.fieldapp.core.ui.components.TileHero
+import ru.newton.fieldapp.core.ui.components.TileSystem
 import ru.newton.fieldapp.core.ui.components.NewtonTile
 import ru.newton.fieldapp.features.survey.codesets.CodeSetsScreen
 import ru.newton.fieldapp.features.survey.continuous.ContinuousSurveyScreen
@@ -110,26 +118,97 @@ private fun SurveyIndexScreen(navController: NavController) {
             )
         },
     ) { padding ->
-        val tiles = listOf(
-            SurveyTile("Карта", Icons.Default.Map) { navController.navigate(MAP_ROUTE) },
-            SurveyTile("Точка", Icons.Default.GpsFixed) { navController.navigate(POINT_ROUTE) },
-            SurveyTile("Линия", Icons.Default.Route) { navController.navigate(LINE_ROUTE) },
-            SurveyTile("Непрерывно", Icons.Default.AllInclusive) { navController.navigate(CONTINUOUS_ROUTE) },
-            SurveyTile("Вынос точки", Icons.Default.Straighten) { navController.navigate(STAKEOUT_PICKER_ROUTE) },
-            SurveyTile("Вынос линии", Icons.Default.Polyline) { navController.navigate(STAKEOUT_LINE_ROUTE) },
-            SurveyTile("История выноса", Icons.Default.History) { navController.navigate(STAKEOUT_HISTORY_ROUTE) },
-            SurveyTile("Трек", Icons.Default.Timeline) { navController.navigate(TRACK_ROUTE) },
-            SurveyTile("CAD", Icons.Default.Architecture) { navController.navigate("cad/view") },
-            SurveyTile("Параметры", Icons.Default.Settings) { navController.navigate(DEFAULTS_ROUTE) },
-        )
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(tiles, key = SurveyTile::title) { tile ->
-                NewtonTile(title = tile.title, icon = tile.icon, onClick = tile.onClick)
+            // Hero "Снять точку" 2×2 + two accent tiles stacked to the right
+            // — primary survey action gets focal weight; map/line are the
+            // next most-used.
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TileHero(
+                    title = "Снять\nточку",
+                    sub = "Усреднение эпох",
+                    icon = Icons.Default.AddLocationAlt,
+                    onClick = { navController.navigate(POINT_ROUTE) },
+                    modifier = Modifier.weight(2f).aspectRatio(1f),
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    TileAccent(
+                        title = "Карта",
+                        icon = Icons.Default.Map,
+                        onClick = { navController.navigate(MAP_ROUTE) },
+                        modifier = Modifier.aspectRatio(1f),
+                    )
+                    TileAccent(
+                        title = "Линия",
+                        icon = Icons.Default.Route,
+                        onClick = { navController.navigate(LINE_ROUTE) },
+                        modifier = Modifier.aspectRatio(1f),
+                    )
+                }
+            }
+
+            // Data row — operational views over collected data
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TileData(
+                    title = "Непрерывно",
+                    icon = Icons.Default.AllInclusive,
+                    onClick = { navController.navigate(CONTINUOUS_ROUTE) },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+                TileData(
+                    title = "Вынос точки",
+                    icon = Icons.Default.Straighten,
+                    onClick = { navController.navigate(STAKEOUT_PICKER_ROUTE) },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+                TileData(
+                    title = "Вынос линии",
+                    icon = Icons.Default.Polyline,
+                    onClick = { navController.navigate(STAKEOUT_LINE_ROUTE) },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+            }
+
+            // System row — history, track recording, CAD, params
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TileSystem(
+                    title = "История",
+                    icon = Icons.Default.History,
+                    onClick = { navController.navigate(STAKEOUT_HISTORY_ROUTE) },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+                TileSystem(
+                    title = "Трек",
+                    icon = Icons.Default.Timeline,
+                    onClick = { navController.navigate(TRACK_ROUTE) },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+                TileSystem(
+                    title = "CAD",
+                    icon = Icons.Default.Architecture,
+                    onClick = { navController.navigate("cad/view") },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+            }
+
+            // Tail row — odd-one parameters tile + spacer to keep grid alignment
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TileSystem(
+                    title = "Параметры",
+                    icon = Icons.Default.Settings,
+                    onClick = { navController.navigate(DEFAULTS_ROUTE) },
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                )
+                Spacer(modifier = Modifier.weight(2f))
             }
         }
     }

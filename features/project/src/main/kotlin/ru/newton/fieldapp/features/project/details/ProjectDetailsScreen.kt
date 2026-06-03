@@ -11,8 +11,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Architecture
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,13 +30,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import ru.newton.fieldapp.core.ui.components.MetricPillRow
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonNavCard
-import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
+import ru.newton.fieldapp.core.ui.components.SectionLabel
+import ru.newton.fieldapp.core.ui.components.TileAccent
+import ru.newton.fieldapp.core.ui.components.TileData
 import ru.newton.fieldapp.crs.CrsPresets
 import ru.newton.fieldapp.crs.displayLabel
+import ru.newton.fieldapp.domain.model.PointSource
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -132,6 +143,10 @@ private fun ContentBody(
     val createdAt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(state.project.createdAtUtc))
     val updatedAt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(state.project.updatedAtUtc))
 
+    val totalPoints = state.points.size
+    val surveyedCount = state.points.count { it.source == PointSource.SURVEY }
+    val importedCount = state.points.count { it.source == PointSource.IMPORT }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -139,34 +154,92 @@ private fun ContentBody(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // ── Hero project header: name + CRS pill + dates + comment ──────
         NewtonCard {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                NewtonSectionLabel("Параметры проекта")
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = state.project.name,
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.W800),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CrsPill(label = crsLabel)
+                }
                 MetaRow("Создан", createdAt)
                 MetaRow("Обновлён", updatedAt)
-                state.project.comment?.takeIf { it.isNotBlank() }?.let { MetaRow("Комментарий", it) }
+                state.project.comment?.takeIf { it.isNotBlank() }?.let {
+                    MetaRow("Комментарий", it)
+                }
             }
         }
 
-        NewtonNavCard(
-            title = "Точки (${state.points.size})",
-            subtitle = "Просмотр, добавление, импорт и экспорт CSV",
-            leadingIcon = Icons.Default.Place,
-            onClick = onOpenPoints,
-        )
+        // ── Stats row: total / surveyed / imported ─────────────────────
+        MetricPillRow {
+            MetricPill(label = "Точек", value = totalPoints.toString(), accent = true)
+            MetricPill(label = "Снято", value = surveyedCount.toString())
+            MetricPill(label = "Импорт", value = importedCount.toString())
+        }
 
-        NewtonNavCard(
-            title = "Слои",
-            subtitle = "Группировка точек и цвета на карте",
-            leadingIcon = Icons.Default.Layers,
-            onClick = onOpenLayers,
-        )
+        // ── Quick-action tile row (Карта / Точки / Слои) ───────────────
+        SectionLabel("Быстрые действия")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Points is the most-used: accent tile (filled, outlined border).
+            TileAccent(
+                title = "Точки",
+                icon = Icons.Default.Place,
+                onClick = onOpenPoints,
+                modifier = Modifier.weight(1f).aspectRatio(1f),
+            )
+            TileData(
+                title = "Слои",
+                icon = Icons.Default.Layers,
+                onClick = onOpenLayers,
+                modifier = Modifier.weight(1f).aspectRatio(1f),
+            )
+            TileData(
+                title = "СК / DXF",
+                icon = Icons.Default.Architecture,
+                onClick = onChangeCrs,
+                modifier = Modifier.weight(1f).aspectRatio(1f),
+            )
+        }
 
+        // ── Full CRS nav card with the human-readable label visible ───
         NewtonNavCard(
             title = "Система координат",
             subtitle = crsLabel,
             leadingIcon = Icons.Default.GpsFixed,
             onClick = onChangeCrs,
+        )
+    }
+}
+
+@Composable
+private fun CrsPill(label: String) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Map,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = 6.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W700),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
 }

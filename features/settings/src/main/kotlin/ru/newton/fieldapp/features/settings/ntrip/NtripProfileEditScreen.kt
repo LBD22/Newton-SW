@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,7 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
@@ -173,14 +173,12 @@ private fun NtripProfileEditContent(
                 )
             }
 
-            Button(
+            NewtonPrimaryButton(
                 onClick = onSave,
+                text = if (state.saving) "Сохранение…" else "Сохранить",
                 enabled = !state.saving,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.saving) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                Text(if (state.saving) "Сохранение…" else "Сохранить")
-            }
+            )
         }
     }
 }

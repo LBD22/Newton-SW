@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newton — Neo Industrial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0,0&display=block" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F2F1E8;
+    --surface: #FFFFFF;
+    --ink: #07173A;
+    --ink-soft: rgba(7,23,58,0.65);
+    --primary: #1750E0;
+    --primary-dark: #0E3DAE;
+    --accent: #FFD000;
+    --accent-dark: #B89400;
+    --success: #1B9D5F;
+    --success-light: #B7EBCB;
+    --warning: #FF8800;
+    --error: #E1000F;
+    --border-w: 2.5px;
+    --shadow-hard: 4px 4px 0 var(--ink);
+    --shadow-hard-sm: 3px 3px 0 var(--ink);
+    --shadow-blue: 4px 4px 0 var(--primary-dark);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background:
+      radial-gradient(ellipse at 30% 0%, #FFE48F 0%, transparent 50%),
+      var(--bg);
+    min-height: 100vh;
+    padding: 56px 32px 80px;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: 500; font-style: normal;
+    font-size: 22px; line-height: 1;
+    display: inline-block; white-space: nowrap; direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  .page-header { text-align: center; margin-bottom: 48px; }
+  .page-header h1 {
+    font-weight: 900; font-size: 36px;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .page-header h1 .accent {
+    color: var(--primary);
+    background: var(--accent);
+    padding: 0 8px;
+    margin: 0 4px;
+    border: var(--border-w) solid var(--ink);
+    display: inline-block;
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .page-header p {
+    margin-top: 14px; color: var(--ink-soft);
+    font-size: 14px; font-weight: 500;
+  }
+  .page-header .tokens {
+    margin-top: 14px; display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+  }
+  .token {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 6px;
+    background: var(--surface);
+    border: 2px solid var(--ink);
+    color: var(--ink);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
+  }
+  .token .swatch { width: 14px; height: 14px; border: 1.5px solid var(--ink); }
+
+  .row { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .phone-label {
+    display: inline-block;
+    color: var(--ink);
+    background: var(--accent);
+    padding: 4px 12px;
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    font-size: 11px; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  .phone {
+    width: 380px; height: 800px;
+    background: var(--bg);
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+    border: 4px solid var(--ink);
+    box-shadow:
+      8px 8px 0 var(--ink),
+      0 30px 60px rgba(7,23,58,0.18);
+  }
+
+  .status-bar {
+    height: 34px; padding: 6px 22px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 800; color: var(--ink);
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+  .status-bar .material-symbols-outlined { font-size: 16px; }
+
+  .top-bar { height: 56px; padding: 0 12px; display: flex; align-items: center; gap: 4px; flex-shrink: 0; border-bottom: var(--border-w) solid var(--ink); }
+  .icon-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: var(--border-w) solid transparent;
+    color: var(--ink); cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--surface); border-color: var(--ink); }
+  .top-bar .title {
+    flex: 1; text-align: center;
+    font-size: 16px; font-weight: 900;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .top-bar .title small {
+    display: block;
+    font-size: 11px; font-weight: 600;
+    color: var(--ink-soft);
+    margin-top: 1px; text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .screen { flex: 1; padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+  /* status card */
+  .status-card {
+    background: var(--surface);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard);
+    padding: 12px 14px;
+    position: relative;
+  }
+  .status-card .sc-top {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .status-card .sc-fix {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 12px;
+    background: var(--success);
+    color: white;
+    font-size: 11px; font-weight: 900;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    border: 2px solid var(--ink);
+  }
+  .status-card .sc-fix .dot {
+    width: 7px; height: 7px;
+    background: white;
+    border: 1px solid var(--ink);
+  }
+  .status-card .sc-meta {
+    margin-left: auto;
+    font-family: 'Roboto Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-size: 11px; font-weight: 700;
+    color: var(--ink); letter-spacing: 0.02em;
+  }
+  .status-card .sc-project {
+    margin-top: 8px;
+    font-size: 15px; font-weight: 800;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: -0.005em;
+  }
+
+  /* Grid */
+  .grid-hero {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 12px;
+  }
+  .tile {
+    background: var(--surface);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    cursor: pointer;
+    position: relative;
+    min-height: 100px;
+  }
+  .tile .tile-icon {
+    width: 36px; height: 36px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .tile .tile-icon .material-symbols-outlined { font-size: 22px; }
+  .tile .tile-label {
+    font-size: 12px; font-weight: 900;
+    color: var(--ink);
+    line-height: 1.1;
+    letter-spacing: -0.005em;
+    text-transform: uppercase;
+    margin-top: auto;
+  }
+  .tile .tile-badge {
+    position: absolute;
+    top: 8px; right: 8px;
+    padding: 1px 8px;
+    background: var(--ink); color: var(--accent);
+    border: 2px solid var(--ink);
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px; font-weight: 800;
+  }
+  .tile.hero {
+    grid-column: span 2; grid-row: span 2;
+    background: var(--accent);
+    padding: 16px;
+    justify-content: space-between;
+    box-shadow: var(--shadow-hard);
+  }
+  .tile.hero .tile-icon {
+    width: 52px; height: 52px;
+    background: var(--ink); color: var(--accent);
+    border-color: var(--ink);
+  }
+  .tile.hero .tile-icon .material-symbols-outlined { font-size: 30px; }
+  .tile.hero .tile-label-big {
+    font-size: 26px; font-weight: 900;
+    line-height: 0.95; letter-spacing: -0.03em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .tile.hero .tile-sub {
+    margin-top: 8px;
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink);
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--surface);
+    border: 2px solid var(--ink);
+  }
+  .tile.primary {
+    background: var(--primary);
+  }
+  .tile.primary .tile-icon { background: var(--accent); color: var(--ink); border-color: var(--ink); }
+  .tile.primary .tile-label { color: var(--surface); }
+  .tile.dim {
+    background: var(--surface);
+  }
+
+  /* Stakeout */
+  .compass-wrap {
+    display: flex; justify-content: center;
+    padding: 4px 0 0;
+  }
+
+  .dist-neo {
+    background: var(--surface);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard);
+    padding: 14px 18px;
+    position: relative;
+  }
+  .dist-neo .label {
+    font-size: 11px; font-weight: 800;
+    color: var(--ink); opacity: 0.7;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .dist-neo .big {
+    margin-top: 2px;
+    font-family: 'Inter', sans-serif;
+    font-feature-settings: 'tnum' 1;
+    font-size: 48px; font-weight: 900;
+    color: var(--ink);
+    line-height: 1; letter-spacing: -0.04em;
+  }
+  .dist-neo .big .unit {
+    font-size: 22px; color: var(--ink-soft);
+    font-weight: 700; margin-left: 4px;
+    letter-spacing: 0;
+  }
+  .dist-neo .divider {
+    height: 2px; background: var(--ink);
+    margin: 10px 0;
+  }
+  .dist-neo .row-info {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--ink);
+    font-weight: 700;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .dist-neo .row-info .val {
+    font-family: 'Roboto Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-weight: 800; color: var(--ink);
+    letter-spacing: 0; text-transform: none;
+  }
+
+  .status-strip {
+    padding: 10px 14px;
+    background: var(--success);
+    color: white;
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 800;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .status-strip .dot {
+    width: 9px; height: 9px;
+    background: white;
+    border: 1px solid var(--ink);
+  }
+
+  /* buttons */
+  .btn-row { display: flex; gap: 10px; }
+  .btn-neo {
+    flex: 1; height: 54px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 13px; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    cursor: pointer;
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .btn-neo.primary { background: var(--primary); color: white; }
+  .btn-neo.accent { background: var(--accent); color: var(--ink); }
+  .btn-neo.outline { background: var(--surface); color: var(--ink); }
+  .btn-neo .material-symbols-outlined { font-size: 18px; }
+
+  /* Settings */
+  .now-pill-neo {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px 6px 10px;
+    background: var(--primary); color: var(--accent);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    font-size: 11px; font-weight: 900;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    align-self: flex-start;
+  }
+  .now-pill-neo .dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border: 1px solid var(--ink);
+  }
+  .section-label-neo {
+    font-size: 11px; font-weight: 900;
+    color: var(--ink);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    margin: 4px 0 -2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label-neo::after {
+    content: ''; flex: 1; height: 2px; background: var(--ink);
+  }
+  .radio-group-neo {
+    background: var(--surface);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .radio-row-neo {
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 2px solid var(--ink);
+    font-size: 14px; font-weight: 800;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .radio-row-neo:last-child { border-bottom: none; }
+  .radio-row-neo.active {
+    background: var(--primary); color: white;
+  }
+  .radio-dot-neo {
+    width: 18px; height: 18px;
+    border: 2px solid var(--ink);
+    background: white;
+    position: relative; flex-shrink: 0;
+  }
+  .radio-row-neo.active .radio-dot-neo { background: var(--accent); }
+  .radio-row-neo.active .radio-dot-neo::after {
+    content: ''; position: absolute;
+    inset: 3px; background: var(--ink);
+  }
+  .list-tile-neo {
+    background: var(--surface);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .list-tile-neo .lt-icon {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .list-tile-neo .lt-body { flex: 1; min-width: 0; }
+  .list-tile-neo .lt-title {
+    font-size: 13px; font-weight: 900; color: var(--ink);
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .list-tile-neo .lt-sub {
+    font-size: 12px; color: var(--ink-soft);
+    font-weight: 600; margin-top: 2px;
+  }
+  .switch-row-neo {
+    padding: 11px 14px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 2px solid var(--ink);
+    font-size: 14px; font-weight: 800;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .switch-row-neo:last-child { border-bottom: none; }
+  .switch-row-neo .label-text { flex: 1; }
+  .switch-neo {
+    width: 46px; height: 24px;
+    background: var(--surface);
+    border: 2px solid var(--ink);
+    position: relative; flex-shrink: 0;
+  }
+  .switch-neo.on { background: var(--primary); }
+  .switch-neo::after {
+    content: ''; position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: var(--ink);
+  }
+  .switch-neo.on::after { left: 24px; background: var(--accent); }
+  .form-row-neo {
+    padding: 11px 14px;
+    background: var(--surface);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    display: flex; align-items: center; gap: 12px;
+    font-size: 14px; font-weight: 800;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .form-row-neo .label-text { flex: 1; }
+  .form-row-neo .value {
+    font-family: 'Roboto Mono', monospace;
+    font-feature-settings: 'tnum' 1;
+    font-weight: 900; color: var(--ink);
+    background: var(--accent);
+    padding: 3px 10px;
+    border: 2px solid var(--ink);
+    font-size: 13px; letter-spacing: 0; text-transform: none;
+  }
+  .pending-neo {
+    padding: 12px 16px 14px;
+    background: var(--bg);
+    border-top: var(--border-w) solid var(--ink);
+    flex-shrink: 0;
+  }
+  .pending-banner-neo {
+    background: var(--accent);
+    border: var(--border-w) solid var(--ink);
+    box-shadow: var(--shadow-hard);
+    padding: 12px 12px 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .pending-banner-neo .warn {
+    width: 36px; height: 36px;
+    background: var(--ink); color: var(--accent);
+    border: 2px solid var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pending-banner-neo .warn .material-symbols-outlined { font-size: 20px; }
+  .pending-banner-neo .pb-body { flex: 1; min-width: 0; }
+  .pending-banner-neo .pb-title {
+    font-size: 13px; font-weight: 900;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pending-banner-neo .pb-sub {
+    font-size: 11px; color: var(--ink);
+    opacity: 0.75;
+    margin-top: 2px; font-weight: 600;
+  }
+  .pending-banner-neo .pb-action {
+    padding: 8px 14px;
+    background: var(--ink); color: var(--accent);
+    border: 2px solid var(--ink);
+    font-size: 12px; font-weight: 900;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  /* nav */
+  .nav-bar {
+    height: 70px;
+    background: var(--surface);
+    border-top: var(--border-w) solid var(--ink);
+    display: flex;
+    padding: 8px 4px 14px;
+    flex-shrink: 0;
+  }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink); opacity: 0.5; cursor: pointer; }
+  .nav-item.active { opacity: 1; }
+  .nav-item .icon-cap { width: 52px; height: 26px; display: flex; align-items: center; justify-content: center; }
+  .nav-item.active .icon-cap {
+    background: var(--accent);
+    border: 2px solid var(--ink);
+  }
+  .nav-item .nav-label {
+    font-size: 10px; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .nav-item .icon-cap .material-symbols-outlined { font-size: 20px; }
+
+  .mt-auto { margin-top: auto; }
+  .scrolly { overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>NEWTON · <span class="accent">NEO</span> INDUSTRIAL</h1>
+  <p>Брутализм — толстые черные границы, hard offset shadow, geometric type, акцент жёлтым</p>
+  <div class="tokens">
+    <span class="token"><span class="swatch" style="background:#07173A;"></span>ink</span>
+    <span class="token"><span class="swatch" style="background:#1750E0;"></span>primary</span>
+    <span class="token"><span class="swatch" style="background:#FFD000;"></span>accent</span>
+    <span class="token"><span class="swatch" style="background:#1B9D5F;"></span>success</span>
+    <span class="token"><span class="swatch" style="background:#FF8800;"></span>warning</span>
+  </div>
+</div>
+
+<div class="row">
+
+  <!-- HOME GRID -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:47</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">menu</span></button>
+        <div class="title">NEWTON<small>N2-RTK · online</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">more_vert</span></button>
+      </div>
+      <div class="screen">
+
+        <div class="status-card">
+          <div class="sc-top">
+            <div class="sc-fix"><span class="dot"></span>RTK FIX</div>
+            <div class="sc-meta">18 SAT · HDOP 0.8 · 1.2с</div>
+          </div>
+          <div class="sc-project">К-12 СЕВЕР</div>
+        </div>
+
+        <div class="grid-hero">
+
+          <div class="tile hero">
+            <div class="tile-icon"><span class="material-symbols-outlined">add_location_alt</span></div>
+            <div>
+              <div class="tile-label-big">СНЯТЬ<br>ТОЧКУ</div>
+              <div class="tile-sub">RTK · 30 эпох</div>
+            </div>
+          </div>
+
+          <div class="tile primary">
+            <div class="tile-icon"><span class="material-symbols-outlined">timeline</span></div>
+            <div class="tile-label">Линия</div>
+          </div>
+
+          <div class="tile primary">
+            <div class="tile-icon"><span class="material-symbols-outlined">flag</span></div>
+            <div class="tile-label">Вынос</div>
+          </div>
+
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">map</span></div>
+            <div class="tile-label">Карта</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">apps</span></div>
+            <div class="tile-badge">142</div>
+            <div class="tile-label">Точки</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">architecture</span></div>
+            <div class="tile-label">CAD</div>
+          </div>
+
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">satellite_alt</span></div>
+            <div class="tile-label">Приёмник</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">cloud</span></div>
+            <div class="tile-label">NTRIP</div>
+          </div>
+          <div class="tile dim">
+            <div class="tile-icon"><span class="material-symbols-outlined">folder_open</span></div>
+            <div class="tile-label">Проекты</div>
+          </div>
+
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active"><div class="icon-cap"><span class="material-symbols-outlined">home</span></div><div class="nav-label">Главная</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">map</span></div><div class="nav-label">Карта</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">apps</span></div><div class="nav-label">Точки</div></div>
+        <div class="nav-item"><div class="icon-cap"><span class="material-symbols-outlined">settings</span></div><div class="nav-label">Настр.</div></div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-001 · ГЛАВНЫЙ</div>
+  </div>
+
+  <!-- STAKEOUT -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:51</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">ВЫНОС ТОЧКИ<small>P-042 · допуск 50 мм</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div class="screen">
+        <div class="compass-wrap">
+          <svg width="260" height="260" viewBox="0 0 260 260">
+            <!-- thick outer ring -->
+            <circle cx="130" cy="130" r="122" fill="#FFFFFF" stroke="#07173A" stroke-width="5"/>
+            <!-- accent inner ring -->
+            <circle cx="130" cy="130" r="108" fill="#FFD000" stroke="#07173A" stroke-width="3"/>
+            <!-- inner circle -->
+            <circle cx="130" cy="130" r="95" fill="#FFFFFF" stroke="#07173A" stroke-width="2"/>
+            <!-- N S E W labels -->
+            <text x="130" y="34" text-anchor="middle" font-family="Inter" font-size="16" font-weight="900" fill="#07173A">N</text>
+            <text x="130" y="234" text-anchor="middle" font-family="Inter" font-size="14" font-weight="800" fill="#07173A">S</text>
+            <text x="32" y="135" text-anchor="middle" font-family="Inter" font-size="14" font-weight="800" fill="#07173A">W</text>
+            <text x="228" y="135" text-anchor="middle" font-family="Inter" font-size="14" font-weight="800" fill="#07173A">E</text>
+            <!-- direction arrow -->
+            <g transform="rotate(47 130 130)">
+              <polygon points="130,42 145,110 130,98 115,110" fill="#1750E0" stroke="#07173A" stroke-width="3"/>
+            </g>
+            <!-- center -->
+            <rect x="120" y="120" width="20" height="20" fill="#07173A"/>
+            <circle cx="130" cy="130" r="4" fill="#FFD000"/>
+          </svg>
+        </div>
+
+        <div class="dist-neo">
+          <div class="label">Расстояние до точки</div>
+          <div class="big">2.347<span class="unit">м</span></div>
+          <div class="divider"></div>
+          <div class="row-info"><span>Азимут</span><span class="val">47° 12′</span></div>
+          <div class="row-info"><span>Δ z</span><span class="val">+0.018 м</span></div>
+        </div>
+
+        <div class="status-strip">
+          <span class="dot"></span>
+          <span>RTK FIX</span>
+          <span style="opacity: 0.7;">·</span>
+          <span>17 SAT</span>
+          <span style="opacity: 0.7;">·</span>
+          <span>HDOP 0.9</span>
+        </div>
+
+        <div class="mt-auto"></div>
+        <div class="btn-row">
+          <button class="btn-neo outline">
+            <span class="material-symbols-outlined">swap_horiz</span>
+            Сменить
+          </button>
+          <button class="btn-neo accent" style="flex: 1.4;">
+            <span class="material-symbols-outlined">push_pin</span>
+            Зафиксировать
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SUR-040 · STAKEOUT</div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="status-bar">
+        <span>12:55</span>
+        <div class="right">
+          <span class="material-symbols-outlined">signal_cellular_alt</span>
+          <span class="material-symbols-outlined">wifi</span>
+          <span class="material-symbols-outlined">battery_full</span>
+        </div>
+      </div>
+      <div class="top-bar">
+        <button class="icon-btn"><span class="material-symbols-outlined">arrow_back</span></button>
+        <div class="title">ПРИЁМНИК<small>«Newton N2-RTK» · в работе</small></div>
+        <button class="icon-btn"><span class="material-symbols-outlined">help_outline</span></button>
+      </div>
+      <div class="screen scrolly" style="gap: 10px;">
+        <span class="now-pill-neo"><span class="dot"></span>АКТИВНО · ROVER / NTRIP</span>
+
+        <div class="section-label-neo">Режим работы</div>
+        <div class="radio-group-neo">
+          <div class="radio-row-neo active"><span class="radio-dot-neo"></span>Rover</div>
+          <div class="radio-row-neo"><span class="radio-dot-neo"></span>Base</div>
+          <div class="radio-row-neo"><span class="radio-dot-neo"></span>Static (PPK)</div>
+        </div>
+
+        <div class="section-label-neo">Источник поправок</div>
+        <div class="list-tile-neo">
+          <div class="lt-icon"><span class="material-symbols-outlined">cloud_download</span></div>
+          <div class="lt-body">
+            <div class="lt-title">NTRIP · «РИВНЕ-Н»</div>
+            <div class="lt-sub">caster.example.ru · mount MAX</div>
+          </div>
+          <span class="material-symbols-outlined" style="color: var(--ink);">chevron_right</span>
+        </div>
+
+        <div class="section-label-neo">Спутниковые системы</div>
+        <div class="radio-group-neo">
+          <div class="switch-row-neo"><span class="label-text">GPS</span><span class="switch-neo on"></span></div>
+          <div class="switch-row-neo"><span class="label-text">GLONASS</span><span class="switch-neo on"></span></div>
+          <div class="switch-row-neo"><span class="label-text">Galileo</span><span class="switch-neo on"></span></div>
+          <div class="switch-row-neo"><span class="label-text">BeiDou</span><span class="switch-neo"></span></div>
+        </div>
+
+        <div class="section-label-neo">Маски наблюдения</div>
+        <div class="form-row-neo">
+          <span class="label-text">Угол возвышения</span>
+          <span class="value">15°</span>
+        </div>
+        <div class="form-row-neo">
+          <span class="label-text">Минимум SNR</span>
+          <span class="value">35 дБ</span>
+        </div>
+      </div>
+
+      <div class="pending-neo">
+        <div class="pending-banner-neo">
+          <div class="warn"><span class="material-symbols-outlined">priority_high</span></div>
+          <div class="pb-body">
+            <div class="pb-title">3 ИЗМЕНЕНИЯ</div>
+            <div class="pb-sub">требуется system save</div>
+          </div>
+          <button class="pb-action">ПРИМЕНИТЬ</button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">SET-010 · НАСТРОЙКИ</div>
+  </div>
+
+</div>
+
+</body>
+</html>

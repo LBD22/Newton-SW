@@ -13,8 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Map
+import ru.newton.fieldapp.crs.displayLabel
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Restore
@@ -44,7 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import ru.newton.fieldapp.core.ui.theme.NewtonTheme
@@ -59,6 +67,7 @@ fun ProjectListScreen(
     onOpenProject: (Long) -> Unit,
     onOpenPoints: (Long) -> Unit,
     onOpenCalibration: () -> Unit,
+    onSurveyPoint: () -> Unit = {},
     viewModel: ProjectListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -123,6 +132,7 @@ fun ProjectListScreen(
             exportLauncher.launch("$suggestedName.newton-backup.zip")
         },
         onImportBackup = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+        onSurveyPoint = onSurveyPoint,
     )
 }
 
@@ -138,6 +148,7 @@ private fun ProjectListContent(
     onMakeActive: (Long) -> Unit = {},
     onExportProject: (Long, String) -> Unit = { _, _ -> },
     onImportBackup: () -> Unit = {},
+    onSurveyPoint: () -> Unit = {},
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -172,11 +183,12 @@ private fun ProjectListContent(
                 is ProjectListState.Content -> ProjectList(
                     items = state.projects,
                     activeId = state.activeProjectId,
-                    activeProjectName = state.projects.firstOrNull { it.id == state.activeProjectId }?.name,
+                    activeProject = state.projects.firstOrNull { it.id == state.activeProjectId },
                     onOpen = onOpenProject,
                     onOpenPoints = onOpenPoints,
                     onMakeActive = onMakeActive,
                     onExportProject = onExportProject,
+                    onSurveyPoint = onSurveyPoint,
                 )
                 is ProjectListState.Error -> ErrorState(state.message)
             }
@@ -186,17 +198,11 @@ private fun ProjectListContent(
 
 @Composable
 private fun EmptyState() {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Проектов ещё нет", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "Нажмите + чтобы создать первый или восстановите из бэкапа",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-        )
-    }
+    ru.newton.fieldapp.core.ui.components.EmptyState(
+        icon = Icons.Default.FolderOpen,
+        title = "Проектов ещё нет",
+        message = "Нажмите «+» чтобы создать первый или восстановите из бэкапа кнопкой сверху.",
+    )
 }
 
 @Composable
@@ -212,26 +218,32 @@ private fun ErrorState(message: String) {
 private fun ProjectList(
     items: List<Project>,
     activeId: Long?,
-    activeProjectName: String?,
+    activeProject: Project?,
     onOpen: (Long) -> Unit,
     onOpenPoints: (Long) -> Unit,
     onMakeActive: (Long) -> Unit,
     onExportProject: (Long, String) -> Unit,
+    onSurveyPoint: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 14.dp),
     ) {
-        // Quick-jump shortcut to the active project's point database. Mirrors
-        // the LandStar dashboard pattern: a survey day starts and ends in
-        // the points list, so it gets pinned at the top.
-        if (activeId != null && activeProjectName != null) {
-            item("active-points-shortcut") {
-                ActivePointsShortcut(
-                    projectName = activeProjectName,
-                    onClick = { onOpenPoints(activeId) },
+        // Active project hero — fills the previously empty top area with a
+        // visible primary CTA ("Снять точку") and a quick jump into the points
+        // list. Without an active project we skip the hero and rely on the
+        // empty state below.
+        if (activeId != null && activeProject != null) {
+            item("active-project-hero") {
+                ActiveProjectHero(
+                    project = activeProject,
+                    onSurveyPoint = onSurveyPoint,
+                    onOpenPoints = { onOpenPoints(activeId) },
                 )
+            }
+            item("all-projects-label") {
+                ru.newton.fieldapp.core.ui.components.SectionLabel("Все проекты")
             }
         }
         items(items, key = { it.id }) { project ->
@@ -247,23 +259,83 @@ private fun ProjectList(
 }
 
 @Composable
-private fun ActivePointsShortcut(projectName: String, onClick: () -> Unit) {
-    ElevatedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Place,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+private fun ActiveProjectHero(
+    project: Project,
+    onSurveyPoint: () -> Unit,
+    onOpenPoints: () -> Unit,
+) {
+    val updatedAt = java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale("ru"))
+        .format(java.util.Date(project.updatedAtUtc))
+    val crsLabel = ru.newton.fieldapp.crs.CrsPresets.parse(project.crsConfig.presetId)
+        ?.displayLabel()
+        ?: project.crsConfig.presetId
+
+    ru.newton.fieldapp.core.ui.components.NewtonCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Eyebrow + project name
+            Text(
+                text = "АКТИВНЫЙ ПРОЕКТ",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
-                Text("База точек", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = project.name,
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.W800,
+                ),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            // CRS pill row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 6.dp).size(16.dp),
+                    )
+                    Text(
+                        text = crsLabel,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.W700,
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
                 Text(
-                    "Активный проект: $projectName",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "·  обновлён $updatedAt",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // CTA row — survey is the dominant action, points-list is secondary
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton(
+                    onClick = onOpenPoints,
+                    text = "Точки",
+                    icon = Icons.Default.Place,
+                    modifier = Modifier.weight(1f),
+                )
+                ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton(
+                    onClick = onSurveyPoint,
+                    text = "Снять точку",
+                    icon = Icons.Default.Add,
+                    modifier = Modifier.weight(1.4f),
                 )
             }
         }
@@ -279,15 +351,28 @@ private fun ProjectRow(
     onExport: (Long, String) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    ElevatedCard(
+    ru.newton.fieldapp.core.ui.components.NewtonCard(
         onClick = { onOpen(project.id) },
         modifier = Modifier.fillMaxWidth(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, top = 14.dp, end = 4.dp, bottom = 14.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // 40dp brand-soft icon-cap so the project row visually matches the
+            // "База точек" shortcut row above it (both ~64dp total height).
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FolderOpen,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(project.name, style = MaterialTheme.typography.titleMedium)
                 project.comment?.takeIf { it.isNotBlank() }?.let {
                     Text(

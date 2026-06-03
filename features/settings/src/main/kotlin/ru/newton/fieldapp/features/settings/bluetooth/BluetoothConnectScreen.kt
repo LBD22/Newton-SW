@@ -33,7 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.bluetooth.LinkState
 import ru.newton.fieldapp.core.ui.components.NewtonCard
@@ -190,41 +190,35 @@ private fun BluetoothConnectContent(
 
 @Composable
 private fun ChannelStatusCard(state: BluetoothConnectState) {
+    val fixColors = LocalFixStatusColors.current
     NewtonCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            NewtonSectionLabel("Каналы SPP")
-            ChannelRow("DataSPP", state.dataLink)
-            ChannelRow("CommandSPP", state.commandLink)
-        }
-    }
-}
-
-@Composable
-private fun ChannelRow(label: String, state: LinkState) {
-    val fixColors = LocalFixStatusColors.current
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        when (state) {
-            is LinkState.Disconnected -> NewtonStatusPill(
-                text = "не подключён",
-                background = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            is LinkState.Connecting -> NewtonStatusPill(
-                text = "подключение… попытка ${state.attempt}",
-                background = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.primary,
-            )
-            is LinkState.Connected -> NewtonSuccessBadge(text = state.deviceName)
-            is LinkState.Error -> NewtonStatusPill(
-                text = state.message.take(40),
-                background = fixColors.noFix.copy(alpha = 0.15f),
-                contentColor = fixColors.noFix,
-            )
+            NewtonSectionLabel("Канал SPP")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Bluetooth", style = MaterialTheme.typography.titleMedium)
+                when (val link = state.link) {
+                    is LinkState.Disconnected -> NewtonStatusPill(
+                        text = "не подключён",
+                        background = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    is LinkState.Connecting -> NewtonStatusPill(
+                        text = "подключение… попытка ${link.attempt}",
+                        background = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    )
+                    is LinkState.Connected -> NewtonSuccessBadge(text = link.deviceName)
+                    is LinkState.Error -> NewtonStatusPill(
+                        text = link.message.take(40),
+                        background = fixColors.noFix.copy(alpha = 0.15f),
+                        contentColor = fixColors.noFix,
+                    )
+                }
+            }
         }
     }
 }

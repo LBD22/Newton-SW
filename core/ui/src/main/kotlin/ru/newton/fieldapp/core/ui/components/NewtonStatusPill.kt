@@ -65,8 +65,8 @@ fun NewtonSuccessBadge(text: String, modifier: Modifier = Modifier) {
     NewtonStatusPill(
         text = text,
         modifier = modifier,
-        background = NewtonPalette.SuccessGreenTint,
-        contentColor = NewtonPalette.SuccessGreenDark,
+        background = NewtonPalette.SuccessSoft,
+        contentColor = NewtonPalette.Success,
     )
 }
 
@@ -78,7 +78,7 @@ fun NewtonInfoBadge(text: String, modifier: Modifier = Modifier) {
     NewtonStatusPill(
         text = text,
         modifier = modifier,
-        background = NewtonPalette.PrimaryBlueTint,
-        contentColor = NewtonPalette.PrimaryBlueDeep,
+        background = NewtonPalette.BrandSoft,
+        contentColor = NewtonPalette.BrandDeep,
     )
 }

@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,6 +16,8 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import ru.newton.fieldapp.core.ui.theme.NewtonTheme
+import ru.newton.fieldapp.data.preferences.DisplayConfig
+import ru.newton.fieldapp.data.preferences.DisplayPreferences
 import ru.newton.fieldapp.data.preferences.LastDeviceStore
 import ru.newton.fieldapp.gnss.data.GnssForegroundService
 import ru.newton.fieldapp.navigation.NewtonNavHost
@@ -25,12 +28,18 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject lateinit var lastDevice: LastDeviceStore
 
+    @Inject lateinit var displayPrefs: DisplayPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         autoReconnectIfRemembered()
         setContent {
-            NewtonTheme {
+            // Read Field-Mode preference reactively — toggling it from
+            // Settings → Дисплей recomposes the whole tree with the
+            // outdoor profile applied.
+            val display by displayPrefs.config.collectAsState(initial = DisplayConfig())
+            NewtonTheme(fieldMode = display.fieldMode) {
                 // `rememberSaveable` so a config change (rotation) doesn't
                 // replay the intro every time the activity recreates.
                 var splashDone by rememberSaveable { mutableStateOf(false) }

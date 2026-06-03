@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.SatelliteAlt
-import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -23,7 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -32,7 +31,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import ru.newton.fieldapp.core.bluetooth.CommandSpp
 import ru.newton.fieldapp.core.bluetooth.DataSpp
 import ru.newton.fieldapp.core.bluetooth.LinkState
 import ru.newton.fieldapp.core.bluetooth.SppTransport
@@ -52,9 +50,9 @@ import javax.inject.Inject
  * icons, plus a high-emphasis filled chip in the centre showing the headline
  * fix label.
  *
- * Reads from [GnssStatusStore] + both [SppTransport.linkState]s (DataSPP,
- * CommandSPP) via a small dedicated ViewModel — the architecture rule is
- * that UI never touches transports or stores directly.
+ * Reads from [GnssStatusStore] + the single [SppTransport.linkState] via a
+ * small dedicated ViewModel — the architecture rule is that UI never touches
+ * transports or stores directly.
  */
 @Composable
 fun GnssStatusStrip(modifier: Modifier = Modifier, viewModel: GnssStatusStripViewModel = hiltViewModel()) {
@@ -119,16 +117,10 @@ private fun GnssStatusStripContent(snapshot: StatusStripSnapshot, modifier: Modi
         }
         val mutedBg = MaterialTheme.colorScheme.surfaceVariant
         NewtonStatusPill(
-            text = if (snapshot.dataLinked) "BT-D ✓" else "BT-D —",
+            text = if (snapshot.btLinked) "BT ✓" else "BT —",
             icon = Icons.Default.Bluetooth,
-            background = if (snapshot.dataLinked) fixColors.fixed.copy(alpha = 0.16f) else mutedBg,
-            contentColor = if (snapshot.dataLinked) fixColors.fixed else fixColors.noFix,
-        )
-        NewtonStatusPill(
-            text = if (snapshot.commandLinked) "BT-C ✓" else "BT-C —",
-            icon = Icons.Default.Sensors,
-            background = if (snapshot.commandLinked) fixColors.fixed.copy(alpha = 0.16f) else mutedBg,
-            contentColor = if (snapshot.commandLinked) fixColors.fixed else fixColors.noFix,
+            background = if (snapshot.btLinked) fixColors.fixed.copy(alpha = 0.16f) else mutedBg,
+            contentColor = if (snapshot.btLinked) fixColors.fixed else fixColors.noFix,
         )
         if (snapshot.phoneBatteryPct in 0..100) {
             // "тел" prefix to make clear this is the *phone*, not the receiver
@@ -169,13 +161,13 @@ private fun formatTime(timestampUtc: Long): String? {
     return SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date(timestampUtc))
 }
 
+@androidx.compose.runtime.Immutable
 data class StatusStripSnapshot(
     val fix: FixQuality,
     val satsUsed: Int,
     val sigmaH: Double?,
     val correctionAgeSec: Double?,
-    val dataLinked: Boolean,
-    val commandLinked: Boolean,
+    val btLinked: Boolean,
     val timestampUtc: Long,
     val phoneBatteryPct: Int,
     /** DevHandbook §6.4 — number of commands waiting for Apply. */
@@ -184,8 +176,7 @@ data class StatusStripSnapshot(
     companion object {
         fun from(
             status: GnssStatus,
-            dataState: LinkState,
-            commandState: LinkState,
+            linkState: LinkState,
             phoneBattery: Int,
             pendingCommandCount: Int,
         ): StatusStripSnapshot = StatusStripSnapshot(
@@ -193,8 +184,7 @@ data class StatusStripSnapshot(
             satsUsed = status.satsUsed,
             sigmaH = status.sigmaH,
             correctionAgeSec = status.correctionAgeSec,
-            dataLinked = dataState is LinkState.Connected,
-            commandLinked = commandState is LinkState.Connected,
+            btLinked = linkState is LinkState.Connected,
             timestampUtc = status.timestampUtc,
             phoneBatteryPct = phoneBattery,
             pendingCommandCount = pendingCommandCount,
@@ -207,24 +197,17 @@ class GnssStatusStripViewModel
     @Inject
     constructor(
         store: GnssStatusStore,
-        @DataSpp dataSpp: SppTransport,
-        @CommandSpp commandSpp: SppTransport,
+        @DataSpp spp: SppTransport,
         battery: PhoneBatteryMonitor,
         commandQueue: CommandQueueRepository,
     ) : ViewModel() {
         val state: StateFlow<StatusStripSnapshot> = combine(
             store.status,
-            dataSpp.linkState,
-            commandSpp.linkState,
+            spp.linkState,
             battery.percentage,
             commandQueue.observePendingCount(),
-        ) { values ->
-            val status = values[0] as GnssStatus
-            val data = values[1] as LinkState
-            val command = values[2] as LinkState
-            val pct = values[3] as Int
-            val pending = values[4] as Int
-            StatusStripSnapshot.from(status, data, command, pct, pending)
+        ) { status, link, pct, pending ->
+            StatusStripSnapshot.from(status, link, pct, pending)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
@@ -233,8 +216,7 @@ class GnssStatusStripViewModel
                 satsUsed = 0,
                 sigmaH = null,
                 correctionAgeSec = null,
-                dataLinked = false,
-                commandLinked = false,
+                btLinked = false,
                 timestampUtc = 0L,
                 phoneBatteryPct = -1,
                 pendingCommandCount = 0,

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug-only design-system preview. Excluded from release APKs because
+             it ships purely for visual smoke-testing the :core:ui component
+             library. Launch via:
+             adb shell am start -n ru.newton.fieldapp.debug/ru.newton.fieldapp.designpreview.DesignPreviewActivity -->
+        <activity
+            android:name="ru.newton.fieldapp.designpreview.DesignPreviewActivity"
+            android:exported="true"
+            android:label="Newton Design Preview"
+            android:theme="@style/Theme.NewtonFieldApp" />
+    </application>
+
+</manifest>

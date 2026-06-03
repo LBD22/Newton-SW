@@ -31,11 +31,9 @@ import javax.inject.Singleton
  * `Reconnecting(nextAttemptInMs)` and retry with exponential backoff
  * 1s..30s ceiling, until the consumer cancels the flow.
  *
- * **Critical (per `docs/protocol-newton.md` § RTCM flow):** the byte stream
- * from this client must end up on `@CommandSpp.write(...)`. Writing it to
- * `@DataSpp` is silent corruption — the receiver drops the bytes and the
- * fix never progresses past Single/Float. Don't lose this between the
- * client and the transport.
+ * Per `docs/protocol-newton.md` § RTCM flow, the receiver only accepts RTCM
+ * after `input set bluetooth` is configured. The byte stream from this client
+ * is handed to [NtripForwarder], which writes to the shared SPP transport.
  */
 @Singleton
 class NtripClient(

@@ -1,6 +1,7 @@
 package ru.newton.fieldapp.core.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,15 +21,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ru.newton.fieldapp.core.ui.theme.NewtonTheme
 
 /**
- * Tappable list-item card with leading icon-on-tinted-square, title, optional
- * subtitle, and trailing chevron. Matches the index-screen style in the
- * brand reference (the "Конфигурация оборудования" rows on the dashboard).
+ * Tappable list-item card matching Field Blue spec §6.5 ListTile:
+ * white surface · hairline border · 16dp radius · 40dp brand-soft icon
+ * container with brand glyph · titleMedium / bodyMedium body · trailing
+ * chevron in text-3.
+ *
+ * Use [ListTile] (in `SettingsRows.kt`) when you want the inline navy variant
+ * for hardware items. This stays around for callers that already use the
+ * legacy API — same visuals.
  */
 @Composable
 fun NewtonNavCard(
@@ -39,41 +45,46 @@ fun NewtonNavCard(
     leadingIcon: ImageVector? = null,
     trailingBadge: (@Composable () -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val colors = NewtonTheme.colors
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .shadow(1.dp, shape, ambientColor = Color(0x10000000), spotColor = Color(0x10000000))
+            .heightIn(min = 64.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(colors.surface)
+            .border(1.dp, colors.hairline, shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         leadingIcon?.let { icon ->
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.brandSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = colors.brand,
                 )
             }
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W700),
+                color = colors.text,
+            )
             subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.text2,
                 )
             }
         }
@@ -81,7 +92,7 @@ fun NewtonNavCard(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = colors.text3,
         )
     }
 }

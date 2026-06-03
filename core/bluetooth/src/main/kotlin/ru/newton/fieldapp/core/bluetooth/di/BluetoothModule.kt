@@ -14,30 +14,34 @@ import ru.newton.fieldapp.core.logging.AppLog
 import javax.inject.Singleton
 
 /**
- * Two-transport binding for the Newton receiver: one carries NMEA/RTCM down to
- * the phone (DataSPP), the other handles bidirectional command traffic and
- * carries phone→receiver RTCM uploads (CommandSPP).
+ * The Newton receiver exposes a **single** RFCOMM channel under the standard
+ * SPP service UUID. Both NMEA/RTCM downstream traffic and the bidirectional
+ * command text share that one pipe — the receiver firmware interleaves them.
  *
- * They are functionally identical class-wise — only the role tag differs, used
- * for log prefixing. Channel selection happens at the protocol layer when both
- * sockets are open against the same UUID.
+ * We keep the two Hilt qualifiers (`@DataSpp`, `@CommandSpp`) as semantic role
+ * tags for call-site readability, but they resolve to the **same** transport
+ * instance. Opening two parallel `BluetoothSocket`s against the same RFCOMM
+ * endpoint was the historic source of `read failed, socket might closed or
+ * timeout, read ret: -1` on whichever socket lost the race — there is no
+ * second channel to bind to.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object BluetoothModule {
     @Provides
     @Singleton
-    @DataSpp
-    fun provideDataSpp(
+    fun provideBluetoothSppTransport(
         @ApplicationContext context: Context,
         log: AppLog,
-    ): SppTransport = BluetoothSppTransport(context = context, role = "DataSPP", log = log)
+    ): BluetoothSppTransport = BluetoothSppTransport(context = context, log = log)
+
+    @Provides
+    @Singleton
+    @DataSpp
+    fun provideDataSpp(transport: BluetoothSppTransport): SppTransport = transport
 
     @Provides
     @Singleton
     @CommandSpp
-    fun provideCommandSpp(
-        @ApplicationContext context: Context,
-        log: AppLog,
-    ): SppTransport = BluetoothSppTransport(context = context, role = "CommandSPP", log = log)
+    fun provideCommandSpp(transport: BluetoothSppTransport): SppTransport = transport
 }

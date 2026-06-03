@@ -32,7 +32,7 @@ Rule of thumb: **if it's in `gradle/libs.versions.toml`, you can use it. If it's
 - `:features:*` never see each other. Shared UI goes to `:core:ui`, shared domain to `:domain`.
 - `:domain` has **no Android imports**. Pure Kotlin + coroutines.
 - `:gnss:*` modules don't know about `:domain` or `:data`. They expose low-level APIs.
-- `:core:bluetooth` knows nothing about GNSS or Newton commands. Just two SPP channels with a transport abstraction.
+- `:core:bluetooth` knows nothing about GNSS or Newton commands. One RFCOMM socket; `@DataSpp` / `@CommandSpp` are role tags over the same singleton.
 
 Dependency rule enforcement is manual in MVP — we lint architecture during code review, not via Konsist (yet).
 
@@ -82,7 +82,7 @@ Dependency rule enforcement is manual in MVP — we lint architecture during cod
 
 ### Comments
 
-- Write **why**, not **what**. "Using CommandSPP not DataSPP because protocol requires it" — yes. "Sets the value" — no.
+- Write **why**, not **what**. "Tagging this write @CommandSpp because the receiver only accepts RTCM after `input set bluetooth`" — yes. "Sets the value" — no.
 - Protocol-specific constants must link to `docs/protocol-newton.md` section.
 
 ---
@@ -91,7 +91,7 @@ Dependency rule enforcement is manual in MVP — we lint architecture during cod
 
 Full reference: `docs/protocol-newton.md`.
 
-1. **Two Bluetooth SPP channels**: DataSPP (receiver→phone, NMEA/RTCM) and CommandSPP (bidirectional, text commands). They are **independent** — one can fail while the other works. UI must reflect this.
+1. **One Bluetooth SPP channel**. The Newton receiver advertises a single RFCOMM record; NMEA, RTCM, command replies and our outgoing commands/RTCM all share that one socket. `@DataSpp` and `@CommandSpp` are call-site role tags resolving to the same transport instance — don't try to open a second socket, you'll race yourself.
 
 2. **Four OK responses**: `OK` (AT only), `OK+` (command mode on), `OK-` (command mode off), `OK!` (queued/applied). **Do not collapse them**. The parser must distinguish.
 
@@ -99,7 +99,7 @@ Full reference: `docs/protocol-newton.md`.
 
 4. **Commands are case-sensitive**. `Mode set rover` ≠ `mode set rover`. Don't capitalize for "readability".
 
-5. **RTCM from NTRIP goes to CommandSPP, not DataSPP**. Counterintuitive, yes. See `docs/protocol-newton.md` § RTCM flow for why.
+5. **RTCM from NTRIP is written via `@CommandSpp.write(bytes)`** — role tag for the upstream/command side of the shared transport. See `docs/protocol-newton.md` § RTCM flow.
 
 6. **Nothing is applied until `system save`**. Every setting change goes into the `command_queue` table (Room) and is flushed only on explicit user Apply. This is a user-visible guarantee — do not add "auto-apply" shortcuts.
 
@@ -142,7 +142,7 @@ Claude Code should refuse / push back if asked to:
 - Add KAPT instead of KSP.
 - Use Moshi or Gson instead of kotlinx.serialization.
 - Hard-code the source separator `|` in Newton commands.
-- Write RTCM bytes to DataSPP.
+- Open a second Bluetooth socket against the Newton receiver, or treat `@DataSpp` and `@CommandSpp` as independent transports.
 - Return `StateFlow<Any>` or use untyped maps for state.
 - Commit secrets (NTRIP passwords, API keys) to git.
 - Skip writing a test for a new NMEA parser.

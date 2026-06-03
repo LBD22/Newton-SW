@@ -23,11 +23,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
+import ru.newton.fieldapp.core.ui.components.SwitchRow
 import ru.newton.fieldapp.data.preferences.AngleFormat
+import ru.newton.fieldapp.data.preferences.DisplayConfig
 import ru.newton.fieldapp.data.preferences.LengthUnit
 import ru.newton.fieldapp.data.preferences.UnitsConfig
 
@@ -37,10 +39,13 @@ fun UnitsScreen(
     viewModel: UnitsSettingsViewModel = hiltViewModel(),
 ) {
     val config by viewModel.config.collectAsStateWithLifecycle()
+    val display by viewModel.display.collectAsStateWithLifecycle()
     UnitsContent(
         config = config,
+        display = display,
         onLength = viewModel::setLength,
         onAngle = viewModel::setAngle,
+        onFieldMode = viewModel::setFieldMode,
         onBack = onBack,
     )
 }
@@ -49,8 +54,10 @@ fun UnitsScreen(
 @Composable
 private fun UnitsContent(
     config: UnitsConfig,
+    display: DisplayConfig,
     onLength: (LengthUnit) -> Unit,
     onAngle: (AngleFormat) -> Unit,
+    onFieldMode: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -112,6 +119,25 @@ private fun UnitsContent(
                         label = "Градусы-минуты-секунды (55°45'20.88\")",
                         selected = config.angle == AngleFormat.DMS,
                         onClick = { onAngle(AngleFormat.DMS) },
+                    )
+                }
+            }
+
+            NewtonCard {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NewtonSectionLabel("Дисплей")
+                    SwitchRow(
+                        label = "Полевой режим",
+                        checked = display.fieldMode,
+                        onCheckedChange = onFieldMode,
+                        showDivider = false,
+                    )
+                    Text(
+                        text = "Тёплая поверхность, плотные границы, более жирный " +
+                            "текст — лучше читается на ярком солнце.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp),
                     )
                 }
             }

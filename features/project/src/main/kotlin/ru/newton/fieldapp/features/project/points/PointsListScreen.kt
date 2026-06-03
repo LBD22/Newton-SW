@@ -18,9 +18,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.foundation.layout.PaddingValues
+import ru.newton.fieldapp.core.ui.components.NewtonCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -46,7 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import ru.newton.fieldapp.domain.model.Point
@@ -290,16 +293,20 @@ private fun PointsListContent(
                     -> Unit
                     is ProjectDetailsState.Content -> {
                         if (filtered.isEmpty()) {
-                            Text(
-                                if (points.isEmpty()) {
-                                    "Точек ещё нет. Нажмите + чтобы добавить."
-                                } else {
-                                    "Ничего не найдено."
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.Center),
-                            )
+                            if (points.isEmpty()) {
+                                ru.newton.fieldapp.core.ui.components.EmptyState(
+                                    icon = androidx.compose.material.icons.Icons.Default.Place,
+                                    title = "Точек ещё нет",
+                                    message = "Нажмите «+» внизу, чтобы добавить вручную, " +
+                                        "или импортируйте из CSV через меню.",
+                                )
+                            } else {
+                                ru.newton.fieldapp.core.ui.components.EmptyState(
+                                    icon = androidx.compose.material.icons.Icons.Default.Search,
+                                    title = "Ничего не найдено",
+                                    message = "Попробуй смягчить фильтры или сменить поисковый запрос.",
+                                )
+                            }
                         } else {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
@@ -326,11 +333,12 @@ private fun sourceLabel(source: PointSource): String = when (source) {
 
 @Composable
 private fun PointRow(point: Point, onClick: () -> Unit) {
-    ElevatedCard(
+    NewtonCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
+        contentPadding = PaddingValues(12.dp),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column {
             Text("${point.name}  rev ${point.revision}", style = MaterialTheme.typography.titleMedium)
             Text(
                 "N=${"%.3f".format(point.n)}  E=${"%.3f".format(point.e)}  H=${"%.3f".format(point.h)}",
