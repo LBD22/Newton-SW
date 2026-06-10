@@ -37,9 +37,9 @@ import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
 import ru.newton.fieldapp.core.ui.components.PendingBanner
-import ru.newton.fieldapp.features.settings.nav.PendingChangesViewModel
 import ru.newton.fieldapp.data.receiver.PendingChangesService
 import ru.newton.fieldapp.domain.receiver.PppSetting
+import ru.newton.fieldapp.features.settings.nav.PendingChangesViewModel
 import javax.inject.Inject
 
 /**

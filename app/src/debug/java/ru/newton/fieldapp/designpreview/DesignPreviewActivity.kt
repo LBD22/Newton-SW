@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddLocationAlt
@@ -44,12 +42,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.newton.fieldapp.core.ui.components.CompassRose
 import ru.newton.fieldapp.core.ui.components.EpochProgressRing
+import ru.newton.fieldapp.core.ui.components.ExtendedFieldFab
 import ru.newton.fieldapp.core.ui.components.FieldOutlineButton
 import ru.newton.fieldapp.core.ui.components.FieldPrimaryButton
 import ru.newton.fieldapp.core.ui.components.FieldTextField
 import ru.newton.fieldapp.core.ui.components.FixQuality
 import ru.newton.fieldapp.core.ui.components.FormRow
-import ru.newton.fieldapp.core.ui.components.ExtendedFieldFab
 import ru.newton.fieldapp.core.ui.components.InlineStatus
 import ru.newton.fieldapp.core.ui.components.ListTile
 import ru.newton.fieldapp.core.ui.components.ListTileIconVariant

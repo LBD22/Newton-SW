@@ -1,16 +1,22 @@
 package ru.newton.fieldapp.features.settings.ntrip
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
-import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +29,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,6 +39,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 
 @Composable
 fun NtripProfileEditScreen(
@@ -54,6 +65,8 @@ fun NtripProfileEditScreen(
         onPasswordChanged = viewModel::onPasswordChanged,
         onSendNmeaChanged = viewModel::onSendNmeaChanged,
         onUseTlsChanged = viewModel::onUseTlsChanged,
+        onLoadMountpoints = viewModel::onLoadMountpoints,
+        onMountpointSelected = viewModel::onMountpointSelected,
         onSave = viewModel::onSaveClicked,
     )
 }
@@ -71,6 +84,8 @@ private fun NtripProfileEditContent(
     onPasswordChanged: (String) -> Unit,
     onSendNmeaChanged: (Boolean) -> Unit,
     onUseTlsChanged: (Boolean) -> Unit,
+    onLoadMountpoints: () -> Unit,
+    onMountpointSelected: (String) -> Unit,
     onSave: () -> Unit,
 ) {
     Scaffold(
@@ -85,8 +100,17 @@ private fun NtripProfileEditContent(
             )
         },
     ) { padding ->
+        // verticalScroll + imePadding: the form is taller than a phone screen
+        // once the keyboard is up. Without scroll the password field was clipped
+        // and the Save button slid off the bottom edge — unreachable, which read
+        // to testers as "saving does nothing".
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             OutlinedTextField(
@@ -129,6 +153,11 @@ private fun NtripProfileEditContent(
                 singleLine = true,
                 enabled = !state.saving,
                 modifier = Modifier.fillMaxWidth(),
+            )
+            MountpointPicker(
+                state = state,
+                onLoadMountpoints = onLoadMountpoints,
+                onMountpointSelected = onMountpointSelected,
             )
             OutlinedTextField(
                 value = state.login,
@@ -173,12 +202,89 @@ private fun NtripProfileEditContent(
                 )
             }
 
+            state.saveError?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             NewtonPrimaryButton(
                 onClick = onSave,
                 text = if (state.saving) "Сохранение…" else "Сохранить",
                 enabled = !state.saving,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+}
+
+/**
+ * Source-table mountpoint picker (NTR-002, Баг-003). Fetches the caster's
+ * mountpoint list on demand and lets the user pick one — hand-typing a wrong
+ * mountpoint silently breaks RTK. The free-text field above stays available as
+ * a fallback for casters that don't publish a source table.
+ */
+@Composable
+private fun MountpointPicker(
+    state: NtripProfileEditState,
+    onLoadMountpoints: () -> Unit,
+    onMountpointSelected: (String) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        NewtonSecondaryButton(
+            onClick = onLoadMountpoints,
+            text = "Загрузить список точек",
+            enabled = !state.loadingMountpoints && !state.saving,
+        )
+        if (state.loadingMountpoints) {
+            CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier.padding(start = 12.dp).size(20.dp),
+            )
+        }
+    }
+
+    state.mountpointError?.let { message ->
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+
+    if (state.mountpoints.isNotEmpty()) {
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            NewtonSecondaryButton(
+                onClick = { expanded = true },
+                text = "Выбрать из списка (${state.mountpoints.size})",
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                state.mountpoints.forEach { mp ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(mp.id, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    listOf(mp.format, mp.navSystem)
+                                        .filter { it.isNotBlank() }
+                                        .joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        onClick = {
+                            onMountpointSelected(mp.id)
+                            expanded = false
+                        },
+                    )
+                }
+            }
         }
     }
 }

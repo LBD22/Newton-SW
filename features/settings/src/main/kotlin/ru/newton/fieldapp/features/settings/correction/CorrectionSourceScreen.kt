@@ -2,6 +2,7 @@ package ru.newton.fieldapp.features.settings.correction
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -9,10 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.foundation.layout.PaddingValues
-import ru.newton.fieldapp.core.ui.components.NewtonCard
-import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
-import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.newton.fieldapp.core.ui.components.NewtonCard
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 import ru.newton.fieldapp.gnss.ntrip.NtripProfile
 import ru.newton.fieldapp.gnss.ntrip.NtripState
 
@@ -114,6 +114,7 @@ private fun NtripStatusCard(state: NtripState) {
         NtripState.Idle -> "NTRIP: не подключён"
         is NtripState.FetchingSourceTable -> "Получение source-table…"
         is NtripState.Connecting -> "Подключение к ${state.mountpoint} (попытка ${state.attempt})…"
+        is NtripState.AwaitingCorrections -> "Подключено к ${state.mountpoint} — ожидание поправок (нужна позиция)…"
         is NtripState.Streaming -> "Активно: ${state.mountpoint}, получено ${state.bytesReceived}Б"
         is NtripState.Reconnecting -> "Переподключение к ${state.mountpoint} через ${state.nextAttemptInMs / 1000}с"
         is NtripState.Failed -> "Ошибка: ${state.reason}${state.httpCode?.let { " (HTTP $it)" }.orEmpty()}"

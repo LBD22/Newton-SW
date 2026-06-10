@@ -13,6 +13,16 @@ sealed interface NtripState {
         val attempt: Int,
     ) : NtripState
 
+    /**
+     * TCP + HTTP handshake succeeded, but no RTCM has arrived yet. For VRS
+     * mountpoints the caster won't emit corrections until it receives a valid
+     * GPGGA position from us — so this state is expected briefly until a fix is
+     * available. Distinct from [Connecting] so the UI doesn't look stuck.
+     */
+    data class AwaitingCorrections(
+        val mountpoint: String,
+    ) : NtripState
+
     data class Streaming(
         val mountpoint: String,
         val bytesReceived: Long,

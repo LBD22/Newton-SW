@@ -18,6 +18,18 @@ class CommandLineAggregatorTest {
     }
 
     @Test
+    fun `accepts bare CR terminator`() {
+        val agg = CommandLineAggregator()
+        assertEquals(listOf("OK"), agg.feed("OK\r".toByteArray()))
+    }
+
+    @Test
+    fun `splits multiple CR-terminated replies`() {
+        val agg = CommandLineAggregator()
+        assertEquals(listOf("OK", "OK+"), agg.feed("OK\rOK+\r".toByteArray()))
+    }
+
+    @Test
     fun `holds partial reply across feeds`() {
         val agg = CommandLineAggregator()
         assertEquals(emptyList<String>(), agg.feed("O".toByteArray()))

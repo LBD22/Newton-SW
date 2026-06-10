@@ -66,7 +66,13 @@ class CommandSession(
         if (readerJob?.isActive == true) return
         readerJob = scope.launch {
             transport.incoming.collect { chunk ->
-                aggregator.feed(chunk).forEach { line -> replyChannel.trySend(line) }
+                aggregator.feed(chunk).forEach { line ->
+                    // Log every command-port line (NMEA `$…` excluded) so the
+                    // diagnostics log shows exactly what the receiver replies
+                    // during a handshake — invaluable when AT appears to hang.
+                    if (line.isNotBlank() && !line.startsWith("$")) log.cmd("← $line")
+                    replyChannel.trySend(line)
+                }
             }
         }
     }

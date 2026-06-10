@@ -7,9 +7,11 @@ import java.nio.charset.StandardCharsets
  *
  * Functionally identical to the NMEA aggregator, but lives here so `:gnss:data`
  * doesn't leak into `:gnss:command` (and so changes to one pipeline don't
- * accidentally affect the other). Newton replies terminate with `\r\n`; the
- * aggregator also accepts a bare `\n` to be defensive on flaky USB-Serial
- * adaptors that occasionally drop the carriage return.
+ * accidentally affect the other). Newton replies terminate with `\r\n`, but the
+ * aggregator accepts any of `\r\n`, `\n`, or a bare `\r` as a line terminator —
+ * some receivers/serial stacks end command-port replies with a lone CR, which
+ * (if we only split on `\n`) would leave the `OK` stuck in the buffer forever
+ * and make the handshake time out with "No reply for: AT".
  *
  * Not thread-safe by design — feed it sequentially inside one collector.
  */
@@ -32,11 +34,13 @@ internal class CommandLineAggregator {
         var lineStart = 0
         var i = 0
         while (i < buffer.length) {
-            if (buffer[i] == '\n') {
-                val endExclusive = if (i > 0 && buffer[i - 1] == '\r') i - 1 else i
-                if (endExclusive > lineStart) {
-                    out += buffer.substring(lineStart, endExclusive)
-                }
+            val c = buffer[i]
+            if (c == '\n' || c == '\r') {
+                // Non-empty line ends here; empty lines (back-to-back terminators)
+                // are dropped — command callers never need them.
+                if (i > lineStart) out += buffer.substring(lineStart, i)
+                // Treat a `\r\n` pair as a single terminator.
+                if (c == '\r' && i + 1 < buffer.length && buffer[i + 1] == '\n') i++
                 lineStart = i + 1
             }
             i++

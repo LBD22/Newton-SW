@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import ru.newton.fieldapp.gnss.data.parsers.NmeaParsed
+import ru.newton.fieldapp.gnss.data.parsers.SatelliteInView
 
 class GnssStatusStoreTest {
     @Test
@@ -79,6 +80,34 @@ class GnssStatusStoreTest {
     }
 
     @Test
+    fun `Gsv populates satsVisible from the merged skyplot, summed across constellations`() = runTest {
+        val store = GnssStatusStore()
+        // GPS: single-sentence batch with 2 sats in view.
+        store.submit(
+            NmeaParsed.Gsv(
+                totalMessages = 1,
+                messageNumber = 1,
+                totalSatsInView = 2,
+                satellites = listOf(sat(1, "GP"), sat(2, "GP")),
+            ),
+        )
+        assertEquals(2, store.status.value.satsVisible)
+
+        // GLONASS arrives separately — satsVisible must sum both constellations,
+        // matching the skyplot list size rather than one GSV's field 3.
+        store.submit(
+            NmeaParsed.Gsv(
+                totalMessages = 1,
+                messageNumber = 1,
+                totalSatsInView = 3,
+                satellites = listOf(sat(65, "GL"), sat(66, "GL"), sat(67, "GL")),
+            ),
+        )
+        assertEquals(5, store.status.value.satsVisible)
+        assertEquals(5, store.status.value.satellitesInView.size)
+    }
+
+    @Test
     fun `Unknown and error parses do not mutate state`() = runTest {
         val store = GnssStatusStore()
         store.submit(NmeaParsed.Gga(55.0, 37.0, 4, 12, 0.8, 100.0, 0.5, 0L))
@@ -88,4 +117,12 @@ class GnssStatusStoreTest {
         store.submit(NmeaParsed.Malformed("oops"))
         assertEquals(before, store.status.value)
     }
+
+    private fun sat(prn: Int, constellation: String) = SatelliteInView(
+        prn = prn,
+        elevationDeg = 45,
+        azimuthDeg = 180,
+        snrDbHz = 40,
+        constellation = constellation,
+    )
 }

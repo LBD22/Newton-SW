@@ -71,7 +71,12 @@ class GnssStatusStore
                 // public list, keep other constellations untouched.
                 val mergedAll = _status.value.satellitesInView
                     .filterNot { it.constellation == constellation } + buf.toList()
-                _status.update { it.copy(satellitesInView = mergedAll) }
+                // Derive satsVisible from the merged list rather than GSV field 3
+                // (totalSatsInView is per-constellation only). This keeps the
+                // "Наблюдаемых спутников" counter consistent with the skyplot and
+                // sums across all constellations. Previously satsVisible was never
+                // set, so GNSS Status showed 0 while the main screen showed satsUsed.
+                _status.update { it.copy(satellitesInView = mergedAll, satsVisible = mergedAll.size) }
                 gsvBuffer[constellation] = mutableListOf()
                 gsvLastMessage[constellation] = 0
             }

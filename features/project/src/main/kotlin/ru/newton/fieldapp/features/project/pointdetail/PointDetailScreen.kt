@@ -1,6 +1,9 @@
 package ru.newton.fieldapp.features.project.pointdetail
 
+import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -46,6 +49,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -293,6 +297,7 @@ private fun NoteCard(point: Point, onSaveNote: (String) -> Unit) {
 private fun PhotoCard(point: Point, onSetPhoto: (String?) -> Unit) {
     val context = LocalContext.current
     var pendingFile by remember { mutableStateOf<File?>(null) }
+    var photoError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     val takePictureLauncher = rememberLauncherForActivityResult(
@@ -307,6 +312,37 @@ private fun PhotoCard(point: Point, onSetPhoto: (String?) -> Unit) {
         } else if (file != null) {
             // Camera was cancelled — clean up the empty file we pre-created.
             scope.launch { runCatching { file.delete() } }
+        }
+    }
+
+    // Pre-create the file, hand the camera app a content:// URI, and launch.
+    // Guarded by try/catch: a device with no camera app throws
+    // ActivityNotFoundException, which previously crashed the screen.
+    val launchCamera = {
+        photoError = null
+        val file = newPhotoFile(context, point.id)
+        val uri = FileProvider.getUriForFile(context, FILE_PROVIDER_AUTHORITY, file)
+        try {
+            pendingFile = file
+            takePictureLauncher.launch(uri)
+        } catch (e: ActivityNotFoundException) {
+            pendingFile = null
+            scope.launch { runCatching { file.delete() } }
+            photoError = "На устройстве нет приложения камеры."
+        }
+    }
+
+    // CAMERA is declared in the manifest, so Android requires it to be granted
+    // at runtime before ACTION_IMAGE_CAPTURE — otherwise the camera app throws
+    // SecurityException and the app crashes. Request it contextually here rather
+    // than upfront in onboarding.
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            launchCamera()
+        } else {
+            photoError = "Нет доступа к камере. Разрешите его в настройках приложения."
         }
     }
 
@@ -330,13 +366,22 @@ private fun PhotoCard(point: Point, onSetPhoto: (String?) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            photoError?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NewtonPrimaryButton(
                     onClick = {
-                        val file = newPhotoFile(context, point.id)
-                        pendingFile = file
-                        val uri = FileProvider.getUriForFile(context, FILE_PROVIDER_AUTHORITY, file)
-                        takePictureLauncher.launch(uri)
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) launchCamera() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     },
                     text = if (point.photoPath == null) "Сделать фото" else "Заменить",
                     icon = Icons.Default.PhotoCamera,
