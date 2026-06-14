@@ -21,6 +21,7 @@ import ru.newton.fieldapp.domain.model.NewPoint
 import ru.newton.fieldapp.domain.model.PointSource
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
+import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
 import ru.newton.fieldapp.gnss.data.FixQuality
@@ -94,7 +95,7 @@ class LineSurveyViewModel
                     _state.value = LineSurveyState.Error("Нет ни одной эпохи с фиксом")
                     return@launch
                 }
-                accumulated += samplesToVertex(samples)
+                accumulated += samplesToVertex(samples, poleH, tiltOn)
                 _state.value = LineSurveyState.BetweenVertices(name, accumulated.toList())
             }
         }
@@ -127,6 +128,7 @@ class LineSurveyViewModel
                                 source = PointSource.SURVEY,
                                 externalRef = "line:$name",
                             ),
+                            vertex.observation,
                         )
                     }
                 }.onSuccess {
@@ -193,7 +195,7 @@ class LineSurveyViewModel
             is Crs.Geographic -> Triple(vertex.n, vertex.e, vertex.h)
         }
 
-        private fun samplesToVertex(samples: List<GnssStatus>): Vertex {
+        private fun samplesToVertex(samples: List<GnssStatus>, poleH: Double, tiltOn: Boolean): Vertex {
             val lats = samples.mapNotNull { it.latitude }
             val lons = samples.mapNotNull { it.longitude }
             val hs = samples.mapNotNull { it.ellipsoidalHeight }
@@ -206,6 +208,12 @@ class LineSurveyViewModel
             } else {
                 0.0
             }
-            return Vertex(n = meanLat, e = meanLon, h = meanH, sigmaH = sigmaH)
+            return Vertex(
+                n = meanLat,
+                e = meanLon,
+                h = meanH,
+                sigmaH = sigmaH,
+                observation = ObservationFactory.fromSamples(samples, poleH, tiltOn),
+            )
         }
     }

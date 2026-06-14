@@ -3,7 +3,9 @@ package ru.newton.fieldapp.data.db.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
+import ru.newton.fieldapp.data.db.entity.ObservationEntity
 import ru.newton.fieldapp.data.db.entity.PointEntity
 
 @Dao
@@ -46,6 +48,33 @@ interface PointDao {
 
     @Insert
     suspend fun insert(entity: PointEntity): Long
+
+    @Insert
+    suspend fun insertObservation(observation: ObservationEntity): Long
+
+    /**
+     * Insert a point and (optionally) its quality observation atomically, so a
+     * point never exists without the observation that was meant to accompany it.
+     * The observation's `point_id` is rewired to the freshly-assigned point id.
+     */
+    @Transaction
+    suspend fun insertWithObservation(point: PointEntity, observation: ObservationEntity?): Long {
+        val id = insert(point)
+        if (observation != null) insertObservation(observation.copy(pointId = id))
+        return id
+    }
+
+    @Query("SELECT * FROM observations WHERE point_id = :pointId LIMIT 1")
+    suspend fun observationForPoint(pointId: Long): ObservationEntity?
+
+    @Query(
+        """
+        SELECT o.* FROM observations o
+        INNER JOIN points p ON o.point_id = p.point_id
+        WHERE p.project_id = :projectId
+        """,
+    )
+    suspend fun observationsByProject(projectId: Long): List<ObservationEntity>
 
     /**
      * In-place coordinate update — used by the CRS-change flow (PRJ-004) where

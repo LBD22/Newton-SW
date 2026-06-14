@@ -15,6 +15,13 @@ data class CsvRow(
     val code: String? = null,
     val layer: String? = null,
     val externalRef: String? = null,
+    // Optional measurement-quality metadata (from the point's Observation). Only
+    // emitted when the chosen format includes the quality columns; null on import
+    // when absent. Lets an office reviewer see how each point was measured.
+    val fixType: String? = null,
+    val sigmaPlanM: Double? = null,
+    val sigmaHM: Double? = null,
+    val epochs: Int? = null,
 )
 
 /** What went wrong on a specific input row, with enough detail to surface to the user. */

@@ -1,7 +1,9 @@
 package ru.newton.fieldapp.domain.repository
 
 import kotlinx.coroutines.flow.Flow
+import ru.newton.fieldapp.domain.model.NewObservation
 import ru.newton.fieldapp.domain.model.NewPoint
+import ru.newton.fieldapp.domain.model.Observation
 import ru.newton.fieldapp.domain.model.Point
 import ru.newton.fieldapp.domain.model.Project
 
@@ -68,12 +70,19 @@ interface PointRepository {
     ): String
 
     /**
-     * Persists a new point. If a point with the same name already exists,
-     * creates a new revision (revision + 1), preserving history.
+     * Persists a new point and, optionally, the quality [observation] captured
+     * with it — both in one transaction. If a point with the same name already
+     * exists, creates a new revision (revision + 1), preserving history.
      *
      * Returns the id of the saved point.
      */
-    suspend fun save(point: NewPoint): Long
+    suspend fun save(point: NewPoint, observation: NewObservation? = null): Long
+
+    /** Quality metadata captured with [pointId]; null for imported/manual points. */
+    suspend fun observationForPoint(pointId: Long): Observation?
+
+    /** All observations in a project keyed by point id — used by exports. */
+    suspend fun observationsByProject(projectId: Long): Map<Long, Observation>
 
     /**
      * Updates the (n, e, h) coordinates of an existing point in-place — does

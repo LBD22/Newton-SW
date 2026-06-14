@@ -5,7 +5,9 @@ import kotlinx.coroutines.flow.map
 import ru.newton.fieldapp.data.db.dao.PointDao
 import ru.newton.fieldapp.data.mapper.toDomain
 import ru.newton.fieldapp.data.mapper.toEntity
+import ru.newton.fieldapp.domain.model.NewObservation
 import ru.newton.fieldapp.domain.model.NewPoint
+import ru.newton.fieldapp.domain.model.Observation
 import ru.newton.fieldapp.domain.model.Point
 import ru.newton.fieldapp.domain.repository.PointRepository
 import javax.inject.Inject
@@ -43,12 +45,18 @@ class PointRepositoryImpl
             return "$prefix$suffix"
         }
 
-        override suspend fun save(point: NewPoint): Long {
+        override suspend fun save(point: NewPoint, observation: NewObservation?): Long {
             val previous = dao.latestRevisionByName(point.projectId, point.name)
             val nextRevision = (previous?.revision ?: 0) + 1
             val entity = point.toEntity(revision = nextRevision, createdAtUtc = System.currentTimeMillis())
-            return dao.insert(entity)
+            return dao.insertWithObservation(entity, observation?.toEntity())
         }
+
+        override suspend fun observationForPoint(pointId: Long): Observation? =
+            dao.observationForPoint(pointId)?.toDomain()
+
+        override suspend fun observationsByProject(projectId: Long): Map<Long, Observation> =
+            dao.observationsByProject(projectId).associate { it.pointId to it.toDomain() }
 
         override suspend fun updateCoordinates(id: Long, n: Double, e: Double, h: Double) =
             dao.updateCoordinates(id, n, e, h)

@@ -55,3 +55,24 @@ data class Observation(
 )
 
 enum class AntennaMethod { VERTICAL, SLANT }
+
+/**
+ * Quality metadata to persist with a new point (id/pointId assigned by the
+ * repository; revision follows the point). Passed to [PointRepository.save]
+ * alongside the [NewPoint] so the pair is written in one transaction.
+ */
+data class NewObservation(
+    val fixType: String,
+    val sigmaN: Double?,
+    val sigmaE: Double?,
+    val sigmaH: Double?,
+    val hdop: Double?,
+    val pdop: Double?,
+    val satsUsed: Int?,
+    val correctionAgeSec: Double?,
+    val epochs: Int,
+    val antennaHeightM: Double,
+    val antennaMethod: AntennaMethod,
+    val tiltApplied: Boolean,
+    val timestampUtc: Long,
+)

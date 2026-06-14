@@ -22,6 +22,7 @@ import ru.newton.fieldapp.domain.model.NewPoint
 import ru.newton.fieldapp.domain.model.PointSource
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
+import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
 import ru.newton.fieldapp.gnss.data.FixQuality
@@ -177,6 +178,11 @@ class ContinuousSurveyViewModel
                         padding = prefs.namePadding,
                     )
                     val (n, e, h) = projectCoords(targetCrs, sampleLat, sampleLon, sampleH)
+                    val observation = ObservationFactory.fromSamples(
+                        listOf(sample),
+                        prefs.poleHeightM,
+                        prefs.tiltCorrectionEnabled,
+                    )
                     val saveResult = runCatching {
                         pointRepository.save(
                             NewPoint(
@@ -190,6 +196,7 @@ class ContinuousSurveyViewModel
                                 source = PointSource.SURVEY,
                                 externalRef = "continuous",
                             ),
+                            observation,
                         )
                     }
                     val saveError = saveResult.exceptionOrNull()

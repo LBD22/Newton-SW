@@ -14,6 +14,7 @@ import ru.newton.fieldapp.data.db.dao.TrackDao
 import ru.newton.fieldapp.data.db.entity.CommandQueueEntity
 import ru.newton.fieldapp.data.db.entity.LayerEntity
 import ru.newton.fieldapp.data.db.entity.NtripProfileEntity
+import ru.newton.fieldapp.data.db.entity.ObservationEntity
 import ru.newton.fieldapp.data.db.entity.PendingPatchEntity
 import ru.newton.fieldapp.data.db.entity.PointEntity
 import ru.newton.fieldapp.data.db.entity.ProjectEntity
@@ -35,8 +36,9 @@ import ru.newton.fieldapp.data.db.entity.TrackSessionEntity
         PendingPatchEntity::class,
         CommandQueueEntity::class,
         LayerEntity::class,
+        ObservationEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -48,6 +50,8 @@ import ru.newton.fieldapp.data.db.entity.TrackSessionEntity
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
+        // v11: add the `observations` table (new table → fully auto-migratable).
+        AutoMigration(from = 10, to = 11),
     ],
 )
 abstract class NewtonDatabase : RoomDatabase() {

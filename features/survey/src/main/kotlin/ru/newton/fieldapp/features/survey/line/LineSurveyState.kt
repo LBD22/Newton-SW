@@ -32,4 +32,11 @@ sealed interface LineSurveyState {
     data class Error(val message: String) : LineSurveyState
 }
 
-data class Vertex(val n: Double, val e: Double, val h: Double, val sigmaH: Double)
+data class Vertex(
+    val n: Double,
+    val e: Double,
+    val h: Double,
+    val sigmaH: Double,
+    /** Quality metadata for this vertex's epochs, persisted with the saved point. */
+    val observation: ru.newton.fieldapp.domain.model.NewObservation? = null,
+)

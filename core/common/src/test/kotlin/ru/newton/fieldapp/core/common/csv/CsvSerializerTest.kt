@@ -48,6 +48,32 @@ class CsvSerializerTest {
     }
 
     @Test
+    fun `quality columns round-trip when appended to the format`() {
+        val format = CsvFormat.DEFAULT.copy(
+            columns = CsvFormat.DEFAULT.columns + CsvFormat.QUALITY_COLUMNS,
+        )
+        val rows = listOf(
+            CsvRow(
+                name = "P1",
+                n = 100.0,
+                e = 200.0,
+                h = 12.345,
+                code = "tree",
+                fixType = "fixed",
+                sigmaPlanM = 0.012,
+                sigmaHM = 0.020,
+                epochs = 10,
+            ),
+        )
+        val text = CsvSerializer.write(rows.asSequence(), format)
+        assertTrue(text.contains("fix_type")) { "header missing quality columns: $text" }
+        assertTrue(text.contains("fixed"))
+        val parsed = CsvSerializer.parse(text, format)
+        assertTrue(parsed.issues.isEmpty()) { "issues: ${parsed.issues}" }
+        assertEquals(rows, parsed.rows)
+    }
+
+    @Test
     fun `parses a 1000-point round-trip with diff zero`() {
         // Synthesises 1000 deterministic points, writes them, re-parses, compares.
         val rows = List(1000) { i ->

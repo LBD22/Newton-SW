@@ -23,6 +23,7 @@ import ru.newton.fieldapp.domain.model.StakeoutMode
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.domain.repository.StakeoutResultRepository
+import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -40,7 +41,7 @@ class StakeoutToPointViewModel
         private val pointRepository: PointRepository,
         private val stakeoutHistory: StakeoutResultRepository,
         activeProject: ActiveProjectStore,
-        preferences: SurveyPreferences,
+        private val preferences: SurveyPreferences,
     ) : ViewModel() {
         private val targetId: Long = checkNotNull(savedStateHandle["targetId"]) {
             "StakeoutToPointViewModel requires `targetId` nav arg"
@@ -79,6 +80,12 @@ class StakeoutToPointViewModel
                     val status = store.status.value
                     val crs = CrsPresets.parse(presetId) ?: Crs.Wgs84Geo
                     val (n, e, h) = currentNeh(status, crs)
+                    val prefs = preferences.defaults.firstOrNull()
+                    val observation = ObservationFactory.fromSamples(
+                        listOf(status),
+                        antennaHeightM = prefs?.poleHeightM ?: 0.0,
+                        tiltApplied = prefs?.tiltCorrectionEnabled ?: false,
+                    )
                     pointRepository.save(
                         NewPoint(
                             projectId = targetPoint.projectId,
@@ -91,6 +98,7 @@ class StakeoutToPointViewModel
                             source = PointSource.SURVEY,
                             externalRef = "stakeout-of-${targetPoint.id}",
                         ),
+                        observation,
                     )
                     val deltaH = kotlin.math.hypot(n - targetPoint.n, e - targetPoint.e)
                     val deltaV = h - targetPoint.h

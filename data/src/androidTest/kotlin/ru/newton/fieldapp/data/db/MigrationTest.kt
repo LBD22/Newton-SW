@@ -14,11 +14,11 @@ import org.junit.runner.RunWith
 import java.io.IOException
 
 /**
- * Validates the Room auto-migration chain v1 → v10. Runs as an instrumented
+ * Validates the Room auto-migration chain v1 → v11. Runs as an instrumented
  * test on a device/emulator (`./gradlew :data:connectedAndroidTest`).
  *
- * Why this matters: a user upgrading from Sprint 1 (v1) all the way to v10
- * runs nine `AutoMigration` steps in sequence. If any step is wrong the app
+ * Why this matters: a user upgrading from Sprint 1 (v1) all the way to v11
+ * runs ten `AutoMigration` steps in sequence. If any step is wrong the app
  * will crash on first launch after the update. We seed v1 with a row, run
  * the chain, and assert the row survives.
  */
@@ -64,6 +64,11 @@ class MigrationTest {
             //    no layers exercises the new schema end-to-end.
             val layers = runBlocking { db.layerDao().observeByProject(1L).first() }
             assertTrue(layers.isEmpty())
+
+            // 5. v11 introduced `observations` — querying by project proves the
+            //    new table and its point join migrated in cleanly.
+            val observations = runBlocking { db.pointDao().observationsByProject(1L) }
+            assertTrue(observations.isEmpty())
         } finally {
             db.close()
         }

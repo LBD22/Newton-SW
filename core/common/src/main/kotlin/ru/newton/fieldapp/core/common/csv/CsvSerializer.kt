@@ -84,6 +84,10 @@ object CsvSerializer {
             code = values[CsvColumn.Code]?.takeIf(String::isNotBlank),
             layer = values[CsvColumn.Layer]?.takeIf(String::isNotBlank),
             externalRef = values[CsvColumn.ExternalRef]?.takeIf(String::isNotBlank),
+            fixType = values[CsvColumn.FixType]?.takeIf(String::isNotBlank),
+            sigmaPlanM = values[CsvColumn.SigmaPlan]?.let { parseDouble(it, decimalSeparator) },
+            sigmaHM = values[CsvColumn.SigmaH]?.let { parseDouble(it, decimalSeparator) },
+            epochs = values[CsvColumn.Epochs]?.trim()?.toIntOrNull(),
         )
     }
 
@@ -96,6 +100,10 @@ object CsvSerializer {
             CsvColumn.E -> formatDouble(row.e, format.decimalSeparator)
             CsvColumn.H -> formatDouble(row.h, format.decimalSeparator)
             CsvColumn.ExternalRef -> row.externalRef.orEmpty()
+            CsvColumn.FixType -> row.fixType.orEmpty()
+            CsvColumn.SigmaPlan -> row.sigmaPlanM?.let { formatDouble(it, format.decimalSeparator) }.orEmpty()
+            CsvColumn.SigmaH -> row.sigmaHM?.let { formatDouble(it, format.decimalSeparator) }.orEmpty()
+            CsvColumn.Epochs -> row.epochs?.toString().orEmpty()
         }
         return quoteIfNeeded(raw, format.delimiter)
     }

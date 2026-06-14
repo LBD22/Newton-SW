@@ -19,9 +19,16 @@ class ExportPointsToCsvUseCase
         suspend operator fun invoke(
             projectId: Long,
             format: CsvFormat = CsvFormat.DEFAULT,
+            includeQuality: Boolean = true,
         ): String {
             val points = pointRepository.observePoints(projectId).first()
+            val observations = if (includeQuality) {
+                pointRepository.observationsByProject(projectId)
+            } else {
+                emptyMap()
+            }
             val rows = points.map { p ->
+                val obs = observations[p.id]
                 CsvRow(
                     name = p.name,
                     n = p.n,
@@ -29,8 +36,24 @@ class ExportPointsToCsvUseCase
                     h = p.h,
                     code = p.code,
                     externalRef = p.externalRef,
+                    fixType = obs?.fixType,
+                    sigmaPlanM = obs?.let { horizontalSigma(it.sigmaN, it.sigmaE) },
+                    sigmaHM = obs?.sigmaH,
+                    epochs = obs?.epochs,
                 )
             }
-            return CsvSerializer.write(rows.asSequence(), format)
+            // Append quality columns only when requested, so the default export
+            // shape is unchanged for callers that don't want them.
+            val effectiveFormat = if (includeQuality) {
+                format.copy(columns = format.columns + CsvFormat.QUALITY_COLUMNS)
+            } else {
+                format
+            }
+            return CsvSerializer.write(rows.asSequence(), effectiveFormat)
+        }
+
+        private fun horizontalSigma(sigmaN: Double?, sigmaE: Double?): Double? {
+            if (sigmaN == null || sigmaE == null) return null
+            return kotlin.math.hypot(sigmaN, sigmaE)
         }
     }

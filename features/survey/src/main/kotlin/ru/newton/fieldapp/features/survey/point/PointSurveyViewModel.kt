@@ -17,10 +17,12 @@ import ru.newton.fieldapp.crs.CrsPresets
 import ru.newton.fieldapp.crs.CrsTransformer
 import ru.newton.fieldapp.crs.GeoPoint
 import ru.newton.fieldapp.data.preferences.ActiveProjectStore
+import ru.newton.fieldapp.domain.model.NewObservation
 import ru.newton.fieldapp.domain.model.NewPoint
 import ru.newton.fieldapp.domain.model.PointSource
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
+import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
 import ru.newton.fieldapp.gnss.data.FixQuality
@@ -43,6 +45,10 @@ class PointSurveyViewModel
         val state: StateFlow<PointSurveyState> = _state.asStateFlow()
 
         private var collectingJob: Job? = null
+
+        // Quality metadata for the point currently in Ready, built from the
+        // accepted epochs and persisted with the point on save().
+        private var pendingObservation: NewObservation? = null
 
         fun start() {
             collectingJob?.cancel()
@@ -111,6 +117,7 @@ class PointSurveyViewModel
                     _state.value = PointSurveyState.Error("Нет ни одной эпохи с фиксом")
                     return@launch
                 }
+                pendingObservation = ObservationFactory.fromSamples(samples, poleH, tiltOn)
                 // Auto-name lookup needs the active project; if nothing is
                 // selected yet we fall back to an empty name and let save()
                 // surface the "no active project" error.
@@ -133,6 +140,7 @@ class PointSurveyViewModel
 
         fun cancel() {
             collectingJob?.cancel()
+            pendingObservation = null
             _state.value = PointSurveyState.Idle
         }
 
@@ -178,6 +186,7 @@ class PointSurveyViewModel
                             h = h,
                             source = PointSource.SURVEY,
                         ),
+                        pendingObservation,
                     )
                 }.onSuccess { id -> _state.value = PointSurveyState.Saved(id) }
                     .onFailure { _state.value = PointSurveyState.Error(it.message ?: "Не удалось сохранить точку") }
@@ -185,6 +194,7 @@ class PointSurveyViewModel
         }
 
         fun reset() {
+            pendingObservation = null
             _state.value = PointSurveyState.Idle
         }
 

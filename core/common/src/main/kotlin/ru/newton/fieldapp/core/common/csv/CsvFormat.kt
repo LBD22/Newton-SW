@@ -37,6 +37,14 @@ data class CsvFormat(
 
         /** Excel-RU defaults: `;` delimiter, `,` decimal separator, header row. */
         val EXCEL_RU: CsvFormat = CsvFormat(delimiter = ';', decimalSeparator = ',')
+
+        /** Measurement-quality columns appended to an export for traceability. */
+        val QUALITY_COLUMNS: List<CsvColumn> = listOf(
+            CsvColumn.FixType,
+            CsvColumn.SigmaPlan,
+            CsvColumn.SigmaH,
+            CsvColumn.Epochs,
+        )
     }
 }
 
@@ -49,4 +57,8 @@ enum class CsvColumn(val header: String) {
     E("e"),
     H("h"),
     ExternalRef("external_ref"),
+    FixType("fix_type"),
+    SigmaPlan("sigma_plan_m"),
+    SigmaH("sigma_h_m"),
+    Epochs("epochs"),
 }

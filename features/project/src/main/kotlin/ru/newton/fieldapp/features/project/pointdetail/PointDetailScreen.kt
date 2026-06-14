@@ -67,6 +67,7 @@ import ru.newton.fieldapp.core.ui.components.NewtonInfoBadge
 import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
 import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
+import ru.newton.fieldapp.domain.model.Observation
 import ru.newton.fieldapp.domain.model.Point
 import ru.newton.fieldapp.domain.model.PointSource
 import ru.newton.fieldapp.domain.repository.PointRepository
@@ -91,7 +92,13 @@ class PointDetailViewModel
         }
 
         val state: StateFlow<PointDetailState> = pointRepository.observeById(pointId)
-            .map { p -> if (p == null) PointDetailState.Deleted else PointDetailState.Loaded(p) }
+            .map { p ->
+                if (p == null) {
+                    PointDetailState.Deleted
+                } else {
+                    PointDetailState.Loaded(p, pointRepository.observationForPoint(pointId))
+                }
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PointDetailState.Loading)
 
         fun saveNote(note: String) {
@@ -110,7 +117,7 @@ class PointDetailViewModel
 sealed interface PointDetailState {
     data object Loading : PointDetailState
     data object Deleted : PointDetailState
-    data class Loaded(val point: Point) : PointDetailState
+    data class Loaded(val point: Point, val observation: Observation? = null) : PointDetailState
 }
 
 @Composable
@@ -180,6 +187,7 @@ private fun PointDetailContent(
                 PointDetailState.Deleted -> Unit
                 is PointDetailState.Loaded -> LoadedBody(
                     point = state.point,
+                    observation = state.observation,
                     onSaveNote = onSaveNote,
                     onSetPhoto = onSetPhoto,
                 )
@@ -208,6 +216,7 @@ private fun PointDetailContent(
 @Composable
 private fun LoadedBody(
     point: Point,
+    observation: Observation?,
     onSaveNote: (String) -> Unit,
     onSetPhoto: (String?) -> Unit,
 ) {
@@ -220,6 +229,7 @@ private fun LoadedBody(
     ) {
         AttributesCard(point)
         CoordinatesCard(point)
+        observation?.let { ObservationCard(it) }
         NoteCard(point, onSaveNote)
         PhotoCard(point, onSetPhoto)
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -257,6 +267,40 @@ private fun CoordinatesCard(point: Point) {
             Field("H", "%.4f".format(point.h))
         }
     }
+}
+
+@Composable
+private fun ObservationCard(observation: Observation) {
+    NewtonCard {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            NewtonSectionLabel("Качество измерения")
+            Field("Тип фикса", fixTypeLabel(observation.fixType))
+            Field("Эпох", observation.epochs.toString())
+            observation.sigmaH?.let { Field("σ высоты", "%.3f м".format(Locale.US, it)) }
+            val sigmaHoriz = horizontalSigma(observation.sigmaN, observation.sigmaE)
+            sigmaHoriz?.let { Field("σ план", "%.3f м".format(Locale.US, it)) }
+            observation.hdop?.let { Field("HDOP", "%.1f".format(Locale.US, it)) }
+            observation.satsUsed?.let { Field("Спутников", it.toString()) }
+            observation.correctionAgeSec?.let { Field("Возраст поправок", "%.0f с".format(Locale.US, it)) }
+            Field("Высота антенны", "%.2f м".format(Locale.US, observation.antennaHeight))
+            if (observation.tiltApplied) Field("Tilt-компенсация", "вкл")
+        }
+    }
+}
+
+private fun horizontalSigma(sigmaN: Double?, sigmaE: Double?): Double? {
+    if (sigmaN == null || sigmaE == null) return null
+    return kotlin.math.hypot(sigmaN, sigmaE)
+}
+
+private fun fixTypeLabel(fixType: String): String = when (fixType) {
+    "fixed" -> "Fixed RTK"
+    "float" -> "Float RTK"
+    "single" -> "Single"
+    "dgnss" -> "DGNSS"
+    "ppp" -> "PPP"
+    "none" -> "Нет фикса"
+    else -> fixType
 }
 
 @Composable
