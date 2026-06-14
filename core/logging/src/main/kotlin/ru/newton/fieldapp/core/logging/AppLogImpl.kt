@@ -71,9 +71,14 @@ class AppLogImpl
         override suspend fun exportArchive(daysBack: Int): String =
             withContext(Dispatchers.IO) {
                 val cutoffMs = System.currentTimeMillis() - daysBack * MS_PER_DAY
+                // External app-specific dir (Android/data/<pkg>/files/exports) so the
+                // archive is reachable over USB/MTP and shareable via FileProvider —
+                // cacheDir is internal-only and field controllers can't get at it.
+                val exportsDir = File(context.getExternalFilesDir(null) ?: context.cacheDir, "exports")
+                    .apply { mkdirs() }
                 val outFile =
                     File(
-                        context.cacheDir,
+                        exportsDir,
                         "newton-logs-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.zip",
                     )
                 ZipOutputStream(FileOutputStream(outFile)).use { zip ->

@@ -8,4 +8,8 @@
     <files-path
         name="photos"
         path="photos/" />
+    <!-- Exported diagnostics log archives, shared via the «Журнал» button. -->
+    <external-files-path
+        name="exports"
+        path="exports/" />
 </paths>

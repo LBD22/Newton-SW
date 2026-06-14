@@ -1,5 +1,7 @@
 package ru.newton.fieldapp.features.settings.apply
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,10 +24,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.newton.fieldapp.core.ui.components.NewtonCard
@@ -40,6 +48,7 @@ import ru.newton.fieldapp.data.receiver.CommandQueueItem
 import ru.newton.fieldapp.data.receiver.CommandStatus
 import ru.newton.fieldapp.data.receiver.PreparedCommand
 import ru.newton.fieldapp.domain.receiver.ApplyProgress
+import java.io.File
 
 @Composable
 fun ApplyScreen(
@@ -67,6 +76,19 @@ private fun ApplyContent(
     onClearAudit: () -> Unit,
     onRemoveAuditItem: (Long) -> Unit,
 ) {
+    val context = LocalContext.current
+    // Auto-open the share sheet the moment a fresh archive is written, so the
+    // «Журнал» button has a visible effect (it used to silently drop the zip
+    // into internal cache the user couldn't reach).
+    var sharedPath by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.lastExportPath) {
+        val path = state.lastExportPath
+        if (path != null && path != sharedPath) {
+            sharedPath = path
+            shareLogArchive(context, path)
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -91,8 +113,7 @@ private fun ApplyContent(
                 NewtonSecondaryButton(
                     onClick = onExportLogs,
                     text = "Журнал",
-                    icon = Icons.Default.Download,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1.2f),
                 )
                 NewtonSuccessButton(
                     onClick = onApply,
@@ -116,13 +137,31 @@ private fun ApplyContent(
             AuditBlock(state.auditLog, onClearAudit, onRemoveAuditItem)
             state.lastExportPath?.let { path ->
                 NewtonCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         NewtonSectionLabel("Журнал сохранён")
                         Text(path, style = MaterialTheme.typography.bodySmall)
+                        NewtonSecondaryButton(
+                            onClick = { shareLogArchive(context, path) },
+                            text = "Поделиться журналом",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+/** Fire the system share sheet for an exported log zip via FileProvider. */
+private fun shareLogArchive(context: Context, path: String) {
+    runCatching {
+        val uri = FileProvider.getUriForFile(context, "ru.newton.fieldapp.fileprovider", File(path))
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, "Отправить журнал"))
     }
 }
 

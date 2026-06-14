@@ -150,5 +150,8 @@ private fun ButtonLabel(text: String, color: Color) {
             letterSpacing = TextUnit(0.06f, TextUnitType.Em),
         ),
         color = color,
+        // Never break a short label like "ЖУРНАЛ" char-by-char onto several lines.
+        maxLines = 1,
+        softWrap = false,
     )
 }
