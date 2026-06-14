@@ -154,17 +154,20 @@ class MapSurveyViewModel
         fun focusPoint(point: MapPoint) { _focused.value = point }
         fun clearFocus() { _focused.value = null }
 
-        private fun ru.newton.fieldapp.domain.model.Point.toMapPoint(crs: Crs): MapPoint =
-            when (crs) {
-                is Crs.Geographic -> MapPoint(id = id, name = name, latitudeDeg = n, longitudeDeg = e)
-                is Crs.Projected -> {
-                    val geo = CrsTransformer.unproject(
-                        ProjectedPoint(northingM = n, eastingM = e, heightM = h),
-                        crs,
-                    )
-                    MapPoint(id = id, name = name, latitudeDeg = geo.latDeg, longitudeDeg = geo.lonDeg)
-                }
+        private fun ru.newton.fieldapp.domain.model.Point.toMapPoint(crs: Crs): MapPoint {
+            // Geographic on the project datum, or unprojected from the grid.
+            val geoOnDatum = when (crs) {
+                is Crs.Geographic ->
+                    ru.newton.fieldapp.crs.GeoPoint(latDeg = n, lonDeg = e, ellipsoidalHeightM = h)
+                is Crs.Projected ->
+                    CrsTransformer.unproject(ProjectedPoint(northingM = n, eastingM = e, heightM = h), crs)
             }
+            // Stored points live on the project datum (e.g. Krasovsky/СК-42), but
+            // OSMDroid tiles and the live GGA marker are WGS-84. Without this datum
+            // shift, СК-42 points render ~120-150 m from where the surveyor stands.
+            val wgs84 = CrsTransformer.transformGeo(geoOnDatum, crs, Crs.Wgs84Geo)
+            return MapPoint(id = id, name = name, latitudeDeg = wgs84.latDeg, longitudeDeg = wgs84.lonDeg)
+        }
     }
 
 @Composable

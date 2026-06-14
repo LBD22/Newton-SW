@@ -64,7 +64,7 @@ class NtripClient(
     suspend fun fetchSourceTable(
         host: String,
         port: Int,
-        useTls: Boolean = true,
+        useTls: Boolean = false,
         login: String = "",
         password: String = "",
     ): String = withContext(ioDispatcher) {
@@ -79,7 +79,7 @@ class NtripClient(
             } else {
                 plain
             }
-            val auth = if (login.isNotEmpty()) Credentials.basic(login, password) else null
+            val auth = if (login.isNotEmpty()) Credentials.basic(login, password, Charsets.UTF_8) else null
             val request = buildString {
                 append("GET / HTTP/1.0\r\n")
                 append("Host: ").append(host).append("\r\n")
@@ -93,7 +93,10 @@ class NtripClient(
                 flush()
             }
             // Caster sends the table then closes (or ENDSOURCETABLE) — read to EOF.
-            val body = socket.getInputStream().readBytes().toString(Charsets.ISO_8859_1)
+            // Decode UTF-8 (strict superset of ASCII): Russian casters publish
+            // mountpoint networks/identifiers in UTF-8, which Latin-1 turned into
+            // mojibake in the picker.
+            val body = socket.getInputStream().readBytes().toString(Charsets.UTF_8)
             _state.value = NtripState.Idle
             body
         } catch (t: Throwable) {
@@ -123,7 +126,7 @@ class NtripClient(
                 .url("${profile.scheme}://${profile.host}:${profile.port}/${profile.mountpoint}")
                 .header("User-Agent", USER_AGENT)
                 .header("Ntrip-Version", "Ntrip/2.0")
-                .header("Authorization", Credentials.basic(profile.login, profile.password))
+                .header("Authorization", Credentials.basic(profile.login, profile.password, Charsets.UTF_8))
                 .build()
             try {
                 httpClient.newCall(request).execute().use { response ->

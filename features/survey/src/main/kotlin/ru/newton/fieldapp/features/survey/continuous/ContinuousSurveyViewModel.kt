@@ -124,27 +124,32 @@ class ContinuousSurveyViewModel
                 return
             }
             val targetCrs = CrsPresets.parse(project.crsConfig.presetId) ?: Crs.Wgs84Geo
+            val minFix = prefs.minFix
 
             // "Last saved" anchors for trigger checks. Updated on each save.
             var lastLat: Double? = null
             var lastLon: Double? = null
             var lastSaveAtMs: Long = 0L
+            // De-dup per GGA epoch: the store emits once per NMEA sentence, so
+            // GST/GSA/GSV would otherwise re-evaluate the trigger on the same
+            // position several times a second.
+            var lastEpochTs = -1L
 
             store.status.collect { status ->
                 val current = _state.value
                 if (!current.running) return@collect
                 _state.update { it.copy(currentFix = status.fix) }
-                if (status.fix == FixQuality.NoFix) return@collect
+                if (status.isStale || !status.fix.isAtLeast(minFix)) return@collect
+                if (status.timestampUtc == lastEpochTs) return@collect
+                lastEpochTs = status.timestampUtc
                 val rawLat = status.latitude ?: return@collect
                 val rawLon = status.longitude ?: return@collect
 
-                // Same tilt-correction discipline as the point-survey path —
-                // when IMU is on the user gets pole-tip coordinates everywhere.
-                val sample = if (prefs.tiltCorrectionEnabled) {
-                    TiltCorrector.apply(status, prefs.poleHeightM)
-                } else {
-                    status
-                }
+                // Reduce to the ground mark (height always; lean too when tilt
+                // is on). Skip the epoch if tilt is requested but the IMU is
+                // unusable — same discipline as the point-survey path.
+                val sample = TiltCorrector.reduceToGround(status, prefs.poleHeightM, prefs.tiltCorrectionEnabled)
+                    ?: return@collect
                 val sampleLat = sample.latitude ?: rawLat
                 val sampleLon = sample.longitude ?: rawLon
                 val sampleH = sample.ellipsoidalHeight ?: 0.0

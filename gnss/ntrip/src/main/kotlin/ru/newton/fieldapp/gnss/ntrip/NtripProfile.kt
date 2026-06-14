@@ -20,11 +20,13 @@ data class NtripProfile(
     val password: String,
     val sendNmea: Boolean = false,
     /**
-     * Default to TLS — `Authorization: Basic` over plain HTTP exposes the caster
-     * password on shared Wi-Fi. Legacy NTRIP/1.0 casters that only speak port 2101
-     * over HTTP can be opted into via the SET-013 toggle.
+     * Plain TCP by default. The overwhelming majority of NTRIP casters — and
+     * every Russian caster we test against (ORSYST/4ГНСС on 2101/2103) — speak
+     * plain HTTP/ICY; defaulting to TLS made the first connection fail the SSL
+     * handshake with a cryptic error (field report Баг-003). Turn TLS on via the
+     * SET-013 toggle for the rare caster that requires it.
      */
-    val useTls: Boolean = true,
+    val useTls: Boolean = false,
 ) {
     /** `https://` if [useTls] is set, otherwise `http://`. */
     val scheme: String get() = if (useTls) "https" else "http"

@@ -111,7 +111,10 @@ object CsvSerializer {
 
     private fun formatDouble(value: Double, decimalSeparator: Char): String {
         // 4 fractional digits = 0.1 mm, more than enough for points stored at sub-cm.
-        val s = "%.4f".format(value).let { withDot ->
+        // Locale.US is mandatory: the default formatter on a ru_RU device emits a
+        // comma decimal ("55,1234"), which — with the default dot-decimal CSV —
+        // injects the delimiter into every coordinate cell and corrupts the file.
+        val s = String.format(java.util.Locale.US, "%.4f", value).let { withDot ->
             if (decimalSeparator == ',') withDot.replace('.', ',') else withDot
         }
         // Strip trailing zeros while keeping at least three fractional digits (mm).

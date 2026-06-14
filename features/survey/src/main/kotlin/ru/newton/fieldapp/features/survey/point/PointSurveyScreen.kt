@@ -42,11 +42,14 @@ fun PointSurveyScreen(
     viewModel: PointSurveyViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    // Drop the Idle "press to start" pre-step — opening this screen IS the
-    // intent to capture a point. Auto-start collecting; if the user navigates
-    // back here after saving they stay in the Saved confirmation.
-    LaunchedEffect(Unit) {
-        if (state is PointSurveyState.Idle) viewModel.start()
+    // Drop the Idle "press to start" pre-step — opening this screen IS the intent
+    // to capture a point. Auto-start whenever we are Idle, INCLUDING after the
+    // user taps «Снять следующую» (which resets to Idle): keying on the Idle-ness
+    // re-fires start() each time we return to Idle, instead of dead-ending on the
+    // "Подготовка…" placeholder with no way forward.
+    val isIdle = state is PointSurveyState.Idle
+    LaunchedEffect(isIdle) {
+        if (isIdle) viewModel.start()
     }
     PointSurveyContent(
         state = state,

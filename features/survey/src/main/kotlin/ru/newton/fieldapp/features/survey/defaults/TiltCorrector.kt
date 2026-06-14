@@ -29,21 +29,38 @@ import kotlin.math.sqrt
  * displacement uses the spherical small-distance approximation — accuracy
  * is better than 1 mm for displacements under 1 m, which is the regime of
  * any reasonable pole tilt.
- *
- * Returns the GnssStatus unchanged when [poleHeightM] ≤ 0 or the IMU isn't
- * valid — fail-safe for use during collection where we'd rather skip an
- * epoch than poison it with garbage.
  */
 object TiltCorrector {
     private const val METRES_PER_DEGREE_LAT = 111_320.0
 
-    fun apply(status: GnssStatus, poleHeightM: Double): GnssStatus {
+    /**
+     * Reduce an antenna-phase-centre fix to the ground mark under the pole.
+     *
+     * - `tiltOn == false`: assume a vertical pole — subtract the antenna height
+     *   from the ellipsoidal height only. Always succeeds (the height reduction
+     *   must ALWAYS happen, regardless of tilt, or every point is the pole
+     *   length too high).
+     * - `tiltOn == true`: also remove the horizontal lean using the IMU. Returns
+     *   `null` when the IMU can't be trusted for this epoch, so the caller SKIPS
+     *   it instead of silently mixing an uncorrected (or vertical-pole-only)
+     *   epoch into a tilt-corrected average.
+     */
+    fun reduceToGround(status: GnssStatus, poleHeightM: Double, tiltOn: Boolean): GnssStatus? {
         if (poleHeightM <= 0.0) return status
-        if (!status.imuValid) return status
-        val lat = status.latitude ?: return status
-        val lon = status.longitude ?: return status
-        val pitchDeg = status.pitchDeg ?: return status
-        val rollDeg = status.rollDeg ?: return status
+        return if (tiltOn) {
+            applyTilt(status, poleHeightM)
+        } else {
+            status.copy(ellipsoidalHeight = status.ellipsoidalHeight?.minus(poleHeightM))
+        }
+    }
+
+    /** Returns null when the IMU isn't usable for this epoch (caller skips it). */
+    private fun applyTilt(status: GnssStatus, poleHeightM: Double): GnssStatus? {
+        if (!status.imuValid) return null
+        val lat = status.latitude ?: return null
+        val lon = status.longitude ?: return null
+        val pitchDeg = status.pitchDeg ?: return null
+        val rollDeg = status.rollDeg ?: return null
         val headingDeg = status.headingDeg ?: 0.0
         val height = status.ellipsoidalHeight ?: 0.0
 

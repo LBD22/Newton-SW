@@ -72,6 +72,10 @@ private fun CorrectionSourceContent(
         ) {
             NtripStatusCard(state.ntripState)
 
+            if (state.inputApplyPending) {
+                ApplyPendingCard()
+            }
+
             Text("NTRIP профили", style = MaterialTheme.typography.titleMedium)
             if (state.profiles.isEmpty()) {
                 Text(
@@ -103,6 +107,26 @@ private fun CorrectionSourceContent(
                 onClick = onManageProfiles,
                 text = "Управление профилями…",
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApplyPendingCard() {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "Настройки не применены",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                "Приёмник ещё не переведён на приём RTCM по Bluetooth. Поправки " +
+                    "передаются, но приёмник их игнорирует до нажатия «Применить» " +
+                    "(system save) на экране диагностики.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
             )
         }
     }

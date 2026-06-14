@@ -25,11 +25,16 @@ class CorrectionSourceViewModel
         val state: StateFlow<CorrectionSourceState> = combine(
             repository.observeAll(),
             forwarder.state,
-        ) { profiles, ntripState ->
+            pendingChanges.patch,
+        ) { profiles, ntripState, patch ->
             CorrectionSourceState(
                 profiles = profiles,
                 activeProfileId = forwarder.activeProfile?.id,
                 ntripState = ntripState,
+                // The `input set bluetooth` change is still pending while patch.input
+                // is non-null; combined with an active forwarder it means RTCM is
+                // flowing into a receiver that hasn't been told to accept it yet.
+                inputApplyPending = patch.input != null && forwarder.activeProfile != null,
             )
         }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CorrectionSourceState())

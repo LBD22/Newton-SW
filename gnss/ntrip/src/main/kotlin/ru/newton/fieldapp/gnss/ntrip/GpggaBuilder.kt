@@ -25,7 +25,12 @@ object GpggaBuilder {
         val lat = status.latitude ?: return null
         val lon = status.longitude ?: return null
         if (status.fix == FixQuality.NoFix) return null
-        val height = status.ellipsoidalHeight ?: 0.0
+        // GGA field 9 is orthometric height; we store ellipsoidal, so subtract the
+        // geoid separation back out and report it honestly in field 11. VRS only
+        // needs the position, but a correct GGA avoids confusing strict casters.
+        val ellipsoidal = status.ellipsoidalHeight ?: 0.0
+        val geoidSep = status.geoidSeparation
+        val orthometric = if (geoidSep != null) ellipsoidal - geoidSep else ellipsoidal
 
         val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = nowMillis }
         val time = String.format(
@@ -48,11 +53,12 @@ object GpggaBuilder {
             is FixQuality.Ppp -> 1 // most casters treat unknown >2 as untrusted
         }
         val hdop = status.hdop?.let { String.format(Locale.US, "%.1f", it) } ?: ""
-        val heightStr = String.format(Locale.US, "%.2f", height)
+        val heightStr = String.format(Locale.US, "%.2f", orthometric)
+        val sepStr = String.format(Locale.US, "%.2f", geoidSep ?: 0.0)
         val ageStr = status.correctionAgeSec?.let { String.format(Locale.US, "%.1f", it) } ?: ""
 
         // Field order: time, lat, NS, lon, EW, fix, sats, hdop, height, M, geoidSep, M, age, refId
-        val body = "GPGGA,$time,$latStr,$latHem,$lonStr,$lonHem,$fixField,${status.satsUsed},$hdop,$heightStr,M,0.0,M,$ageStr,"
+        val body = "GPGGA,$time,$latStr,$latHem,$lonStr,$lonHem,$fixField,${status.satsUsed},$hdop,$heightStr,M,$sepStr,M,$ageStr,"
         val checksum = body.fold(0) { acc, c -> acc xor c.code }
         return "\$$body*${"%02X".format(checksum)}\r\n"
     }

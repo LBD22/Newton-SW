@@ -11,9 +11,10 @@ data class NtripProfileEditState(
     val login: String = "",
     val password: String = "",
     val sendNmea: Boolean = false,
-    // TLS-by-default — Authorization: Basic over plain HTTP exposes the caster
-    // password on shared Wi-Fi. User can flip it off for legacy ports/casters.
-    val useTls: Boolean = true,
+    // Plain TCP by default — Russian casters (ORSYST/4ГНСС on 2101/2103) speak
+    // plain HTTP/ICY; TLS-by-default failed the SSL handshake (Баг-003). User
+    // flips TLS on for the rare caster that requires it.
+    val useTls: Boolean = false,
     val errors: FieldErrors = FieldErrors(),
     val saving: Boolean = false,
     val savedId: Long? = null,

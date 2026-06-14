@@ -7,8 +7,10 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import ru.newton.fieldapp.core.bluetooth.LinkState
 
 class CommandSessionTest {
     private fun newSession(transport: FakeSppTransport, scheduler: kotlinx.coroutines.test.TestCoroutineScheduler) =
@@ -108,6 +110,61 @@ class CommandSessionTest {
         assertTrue(!deferred.isCompleted)
         transport.emitIncoming("OK!\r\n")
         assertEquals(OkKind.OK_QUEUED, deferred.await())
+        session.shutdown()
+        testScheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `late reply from a timed-out command does not satisfy the next command`() = runTest {
+        val transport = FakeSppTransport()
+        val session = newSession(transport, testScheduler)
+        session.start()
+
+        // Command A gets no reply within the window and times out.
+        val a = async(start = CoroutineStart.UNDISPATCHED) {
+            runCatching { session.send("commandA") }
+        }
+        testScheduler.advanceTimeBy(CommandSession.REPLY_TIMEOUT_MS + 1)
+        testScheduler.runCurrent()
+        assertTrue(a.await().isFailure) { "commandA should have timed out" }
+
+        // A's OK! now arrives late and lands in the reply channel.
+        transport.emitIncoming("OK!\r\n")
+        repeat(5) { yield() }
+
+        // Command B must wait for its OWN reply — the stale OK! must be drained,
+        // not consumed as B's acknowledgement (off-by-one regression guard).
+        val b = async(start = CoroutineStart.UNDISPATCHED) { session.send("commandB") }
+        repeat(5) { yield() }
+        assertFalse(b.isCompleted) { "commandB consumed a stale reply" }
+        transport.emitIncoming("OK!\r\n")
+        assertEquals(OkKind.OK_QUEUED, b.await())
+
+        session.shutdown()
+        testScheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `link leaving Connected resets a Ready session to Idle`() = runTest {
+        val transport = FakeSppTransport()
+        val session = newSession(transport, testScheduler)
+        session.start()
+
+        val handshake = launch { session.handshake() }
+        repeat(5) { yield() }
+        transport.emitIncoming("OK\r\n")
+        repeat(5) { yield() }
+        transport.emitIncoming("on\r\n")
+        handshake.join()
+        assertEquals(CommandSessionState.Ready, session.state.value)
+
+        // BT drop / receiver power-cycle: command mode is gone on the receiver,
+        // so the session must drop out of Ready to force a re-handshake on the
+        // next Apply rather than firing commands into a dead command port.
+        transport.setLink(LinkState.Disconnected)
+        repeat(5) { yield() }
+        assertEquals(CommandSessionState.Idle, session.state.value)
+
         session.shutdown()
         testScheduler.advanceUntilIdle()
     }

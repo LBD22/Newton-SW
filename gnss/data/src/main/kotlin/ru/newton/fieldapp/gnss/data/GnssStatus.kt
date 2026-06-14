@@ -16,8 +16,10 @@ data class GnssStatus(
     // Position from GPGGA (geographic)
     val latitude: Double?,
     val longitude: Double?,
-    /** Ellipsoidal height, meters. */
+    /** True WGS-84 ellipsoidal height, meters (GGA field 9 + geoid separation). */
     val ellipsoidalHeight: Double?,
+    /** Geoid separation N (GGA field 11), meters. Null if the receiver omits it. */
+    val geoidSeparation: Double? = null,
     // Position projected into the current project CRS (filled by upstream)
     val n: Double?,
     val e: Double?,
@@ -44,6 +46,14 @@ data class GnssStatus(
     /** When this snapshot was produced, epoch millis. */
     val timestampUtc: Long,
     /**
+     * True when no GGA has arrived for longer than the staleness window — the
+     * link dropped, the receiver entered command mode, or NMEA otherwise
+     * stalled. The displayed position/fix are the LAST good values, not live;
+     * survey collectors must not sample and the status strip must show "stale"
+     * rather than a confident green fix over frozen coordinates.
+     */
+    val isStale: Boolean = false,
+    /**
      * GPGSV-derived skyplot. Aggregator merges multi-message GSV batches into
      * a single list keyed by `(constellation, prn)`; UI treats it as a flat
      * "currently visible" snapshot. Empty until at least one full GSV batch
@@ -58,6 +68,7 @@ data class GnssStatus(
                 latitude = null,
                 longitude = null,
                 ellipsoidalHeight = null,
+                geoidSeparation = null,
                 n = null,
                 e = null,
                 h = null,
@@ -75,6 +86,7 @@ data class GnssStatus(
                 rollDeg = null,
                 imuValid = false,
                 timestampUtc = 0L,
+                isStale = false,
                 satellitesInView = emptyList(),
             )
     }

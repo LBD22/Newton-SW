@@ -23,6 +23,8 @@ import ru.newton.fieldapp.domain.model.TrackPointSample
 import ru.newton.fieldapp.domain.model.TrackSession
 import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.domain.repository.TrackRepository
+import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
+import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -42,6 +44,7 @@ class TrackRecordingViewModel
     @Inject
     constructor(
         private val store: GnssStatusStore,
+        private val preferences: SurveyPreferences,
         private val projectRepository: ProjectRepository,
         private val trackRepository: TrackRepository,
         private val activeProject: ActiveProjectStore,
@@ -84,9 +87,13 @@ class TrackRecordingViewModel
                     val name = "Трек ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())}"
                     val sessionId = trackRepository.startSession(project.id, name)
                     val crs = CrsPresets.parse(project.crsConfig.presetId) ?: Crs.Wgs84Geo
+                    val prefs = preferences.defaults.firstOrNull()
+                    val minFix = prefs?.minFix ?: FixQuality.FixedRtk
+                    val poleH = prefs?.poleHeightM ?: 0.0
+                    val tiltOn = prefs?.tiltCorrectionEnabled ?: false
                     activeSessionId.value = sessionId
                     samplerJob?.cancel()
-                    samplerJob = viewModelScope.launch { sample(sessionId, crs) }
+                    samplerJob = viewModelScope.launch { sample(sessionId, crs, minFix, poleH, tiltOn) }
                 }.onFailure {
                     activeSessionId.value = null
                 }
@@ -110,18 +117,29 @@ class TrackRecordingViewModel
          * one sample per second so a 5 Hz receiver doesn't bloat the DB. Skips
          * epochs without a fix.
          */
-        private suspend fun sample(sessionId: Long, crs: Crs) {
-            store.status.collect { status -> appendIfDue(sessionId, crs, status) }
+        private suspend fun sample(sessionId: Long, crs: Crs, minFix: FixQuality, poleH: Double, tiltOn: Boolean) {
+            store.status.collect { status -> appendIfDue(sessionId, crs, status, minFix, poleH, tiltOn) }
         }
 
-        private suspend fun appendIfDue(sessionId: Long, crs: Crs, status: GnssStatus) {
-            if (status.fix == FixQuality.NoFix) return
-            val lat = status.latitude ?: return
-            val lon = status.longitude ?: return
+        private suspend fun appendIfDue(
+            sessionId: Long,
+            crs: Crs,
+            status: GnssStatus,
+            minFix: FixQuality,
+            poleH: Double,
+            tiltOn: Boolean,
+        ) {
+            // Skip stale (NMEA stalled) and sub-threshold epochs — a track must
+            // not record metre-level autonomous points as if they were surveyed.
+            if (status.isStale || !status.fix.isAtLeast(minFix)) return
             val now = System.currentTimeMillis()
             if (now - lastSampleAtMs < SAMPLE_INTERVAL_MS) return
+            // Reduce to the ground mark (height always; lean too when tilt is on).
+            val reduced = TiltCorrector.reduceToGround(status, poleH, tiltOn) ?: return
+            val lat = reduced.latitude ?: return
+            val lon = reduced.longitude ?: return
             lastSampleAtMs = now
-            val height = status.ellipsoidalHeight ?: 0.0
+            val height = reduced.ellipsoidalHeight ?: 0.0
             val (n, e, h) = when (crs) {
                 is Crs.Projected -> {
                     val proj = CrsTransformer.project(GeoPoint(lat, lon, height), Crs.Wgs84Geo, crs)

@@ -30,6 +30,24 @@ class CsvSerializerTest {
     }
 
     @Test
+    fun `default dot-decimal export stays dot-decimal under ru_RU locale`() {
+        val saved = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("ru-RU"))
+            val rows = listOf(CsvRow(name = "P1", n = 1234.5678, e = 7654.321, h = 12.3, code = "tree"))
+            val text = CsvSerializer.write(rows.asSequence())
+            // The numeric cells must use a dot — a comma would inject the default
+            // delimiter and shift every column. Round-trip must also survive.
+            assertTrue(text.contains("1234.5678")) { "expected dot decimal, got: $text" }
+            val parsed = CsvSerializer.parse(text)
+            assertTrue(parsed.issues.isEmpty()) { "unexpected issues: ${parsed.issues}" }
+            assertEquals(rows, parsed.rows)
+        } finally {
+            java.util.Locale.setDefault(saved)
+        }
+    }
+
+    @Test
     fun `parses a 1000-point round-trip with diff zero`() {
         // Synthesises 1000 deterministic points, writes them, re-parses, compares.
         val rows = List(1000) { i ->

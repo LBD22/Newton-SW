@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
+import ru.newton.fieldapp.gnss.data.FixQuality
 import javax.inject.Inject
 
 @HiltViewModel
@@ -67,6 +69,7 @@ class SurveyDefaultsViewModel
         fun setNamePadding(v: Int) { viewModelScope.launch { preferences.update { copy(namePadding = v) } } }
         fun setTiltEnabled(v: Boolean) { viewModelScope.launch { preferences.update { copy(tiltCorrectionEnabled = v) } } }
         fun setPoleHeight(v: Double) { viewModelScope.launch { preferences.update { copy(poleHeightM = v) } } }
+        fun setMinFix(v: FixQuality) { viewModelScope.launch { preferences.update { copy(minFix = v) } } }
         fun addCode(code: String) {
             val trimmed = code.trim()
             if (trimmed.isBlank()) return
@@ -105,6 +108,7 @@ fun SurveyDefaultsScreen(
         onRemoveCode = viewModel::removeCode,
         onTiltEnabledChanged = viewModel::setTiltEnabled,
         onPoleHeightChanged = viewModel::setPoleHeight,
+        onMinFixChanged = viewModel::setMinFix,
     )
 }
 
@@ -122,6 +126,7 @@ private fun SurveyDefaultsContent(
     onRemoveCode: (String) -> Unit,
     onTiltEnabledChanged: (Boolean) -> Unit,
     onPoleHeightChanged: (Double) -> Unit,
+    onMinFixChanged: (FixQuality) -> Unit,
 ) {
     var epochsText by remember(defaults.minEpochs) { mutableStateOf(defaults.minEpochs.toString()) }
     var tolHText by remember(defaults.toleranceHorizontalM) { mutableStateOf("%.3f".format(defaults.toleranceHorizontalM)) }
@@ -190,6 +195,39 @@ private fun SurveyDefaultsContent(
                     Text(
                         "Эпоха ≈ 1 секунда при 1 Гц. 10 эпох даёт ≈ 1 см " +
                             "повторяемости в Fixed RTK.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            NewtonCard {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NewtonSectionLabel("Минимальное качество фикса")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val options = listOf(
+                            FixQuality.Single to "Single",
+                            FixQuality.DGnss to "DGNSS",
+                            FixQuality.FloatRtk to "Float",
+                            FixQuality.FixedRtk to "Fixed",
+                        )
+                        options.forEach { (quality, label) ->
+                            FilterChip(
+                                selected = defaults.minFix == quality,
+                                onClick = { onMinFixChanged(quality) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Text(
+                        "Эпохи хуже выбранного качества не усредняются и не " +
+                            "сохраняются. Для топосъёмки оставьте Fixed RTK — " +
+                            "иначе автономные (метровые) измерения попадут в точку.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -320,11 +358,19 @@ private fun SurveyDefaultsContent(
                             poleHeightText = it
                             it.trim().replace(',', '.').toDoubleOrNull()?.let(onPoleHeightChanged)
                         },
-                        label = { Text("Высота вехи, м") },
+                        label = { Text("Высота антенны над точкой, м") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        enabled = defaults.tiltCorrectionEnabled,
+                        // Always editable: the antenna height is subtracted from
+                        // every stored point regardless of tilt — a vertical pole
+                        // still raises the antenna above the ground mark.
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Высота фазового центра антенны над точкой. Вычитается из " +
+                            "высоты каждой точки всегда, не только при tilt-компенсации.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

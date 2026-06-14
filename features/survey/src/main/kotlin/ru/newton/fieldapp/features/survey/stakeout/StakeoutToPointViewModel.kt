@@ -27,6 +27,8 @@ import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
 import javax.inject.Inject
+import kotlin.math.cos
+import kotlin.math.sin
 
 @HiltViewModel
 class StakeoutToPointViewModel
@@ -120,21 +122,61 @@ class StakeoutToPointViewModel
             val lon = status.longitude ?: return StakeoutState.WaitingForFix
             val height = status.ellipsoidalHeight ?: 0.0
             val crs = CrsPresets.parse(presetId) ?: Crs.Wgs84Geo
-            val (currentN, currentE, currentH) = currentNehFromGeo(lat, lon, height, crs)
-            val vector = StakeoutVector.between(
-                currentN = currentN,
-                currentE = currentE,
-                currentH = currentH,
-                targetN = target.n,
-                targetE = target.e,
-                targetH = target.h,
-            )
+            val vector = when (crs) {
+                is Crs.Projected -> {
+                    val p = CrsTransformer.project(GeoPoint(lat, lon, height), Crs.Wgs84Geo, crs)
+                    StakeoutVector.between(
+                        currentN = p.northingM,
+                        currentE = p.eastingM,
+                        currentH = p.heightM,
+                        targetN = target.n,
+                        targetE = target.e,
+                        targetH = target.h,
+                    )
+                }
+                is Crs.Geographic -> {
+                    // Degrees CANNOT be fed to the planar vector: a 0.03° gap would
+                    // read as "in tolerance" at ~3 km. Project both points into a
+                    // local ENU metre frame anchored at the target instead.
+                    val mPerDegLat = METRES_PER_DEGREE_LAT
+                    val mPerDegLon = mPerDegLat * cos(Math.toRadians(target.n))
+                    StakeoutVector.between(
+                        currentN = (lat - target.n) * mPerDegLat,
+                        currentE = (lon - target.e) * mPerDegLon,
+                        currentH = height,
+                        targetN = 0.0,
+                        targetE = 0.0,
+                        targetH = target.h,
+                    )
+                }
+            }
             return StakeoutState.Active(
                 targetName = target.name,
                 vector = vector,
                 fix = status.fix,
                 toleranceM = toleranceM,
+                headingCorrectionDeg = headingCorrectionDeg(lat, lon, height, crs),
             )
+        }
+
+        /**
+         * Degrees to add to a magnetic-north device heading to reach the frame the
+         * stakeout vector uses. = magnetic declination (magnetic→true) − grid
+         * convergence (true→grid). Convergence is zero for geographic CRSs, whose
+         * vector frame is already true-north aligned.
+         */
+        private fun headingCorrectionDeg(lat: Double, lon: Double, height: Double, crs: Crs): Double {
+            val declination = android.hardware.GeomagneticField(
+                lat.toFloat(),
+                lon.toFloat(),
+                height.toFloat(),
+                System.currentTimeMillis(),
+            ).declination.toDouble()
+            val convergence = when (crs) {
+                is Crs.Projected -> (lon - crs.centralMeridianDeg) * sin(Math.toRadians(lat))
+                is Crs.Geographic -> 0.0
+            }
+            return declination - convergence
         }
 
         private fun currentNeh(status: GnssStatus, crs: Crs): Triple<Double, Double, Double> {
@@ -155,5 +197,9 @@ class StakeoutToPointViewModel
                 Triple(p.northingM, p.eastingM, p.heightM)
             }
             is Crs.Geographic -> Triple(lat, lon, h)
+        }
+
+        private companion object {
+            const val METRES_PER_DEGREE_LAT = 111_320.0
         }
     }

@@ -1,6 +1,7 @@
 package ru.newton.fieldapp.crs.geoid
 
-import java.io.DataInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.floor
 
 /**
@@ -59,8 +60,12 @@ object Egm86 : Geoid {
     private fun tryLoad(): FloatArray? {
         val stream = Egm86::class.java.getResourceAsStream(RESOURCE_PATH) ?: return null
         return runCatching {
-            DataInputStream(stream.buffered()).use { input ->
-                FloatArray(LON_COUNT * LAT_COUNT) { input.readFloat() }
+            stream.buffered().use { input ->
+                // The grid is little-endian float32 (see class KDoc). DataInputStream
+                // reads big-endian, which silently byte-swaps every undulation into
+                // garbage — read through a LITTLE_ENDIAN ByteBuffer instead.
+                val buffer = ByteBuffer.wrap(input.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
+                FloatArray(LON_COUNT * LAT_COUNT) { buffer.float }
             }
         }.getOrNull()
     }

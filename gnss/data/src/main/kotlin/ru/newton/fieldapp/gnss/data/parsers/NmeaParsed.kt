@@ -28,14 +28,25 @@ sealed interface NmeaParsed {
 
     /** GPGGA: position, fix quality, correction age. */
     data class Gga(
-        val latitude: Double,
-        val longitude: Double,
+        // Null when the receiver has no fix (quality 0 → empty lat/lon cells).
+        // A no-fix GGA is a valid, meaningful sentence — it tells the UI the fix
+        // was lost — so it must NOT be dropped as Malformed.
+        val latitude: Double?,
+        val longitude: Double?,
         val fixQuality: Int, // raw GGA field 6; map to FixQuality at the store
         val satsUsed: Int,
         val hdop: Double?,
+        /**
+         * True WGS-84 ellipsoidal height = GGA field 9 (orthometric) + field 11
+         * (geoid separation). The parser reconstructs it so downstream CRS code
+         * always receives an ellipsoidal value regardless of the receiver's
+         * `coordsystem geoid` mode. Falls back to raw field 9 if separation absent.
+         */
         val ellipsoidalHeight: Double?,
         val correctionAgeSec: Double?,
         val timestampUtcMs: Long,
+        /** GGA field 11, geoid separation (N) in metres. Null if not provided. */
+        val geoidSeparation: Double? = null,
     ) : NmeaParsed
 
     /** GPGST: accuracy estimates. */

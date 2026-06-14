@@ -38,6 +38,25 @@ class GnssStatusStoreTest {
     }
 
     @Test
+    fun `no-fix Gga clears position and stale accuracy`() = runTest {
+        val store = GnssStatusStore()
+        // A good fixed-RTK epoch with σ from GST.
+        store.submit(NmeaParsed.Gga(55.0, 37.0, 4, 12, 0.8, 100.0, 0.5, 0L))
+        store.submit(NmeaParsed.Gst(sigmaLat = 0.01, sigmaLon = 0.01, sigmaAlt = 0.02))
+        assertEquals(0.02, store.status.value.sigmaH)
+
+        // Fix lost: a quality-0 GGA with empty (null) position. The frozen cm
+        // accuracy must NOT linger, and position must clear — otherwise the strip
+        // shows a confident fix over stale coordinates.
+        store.submit(NmeaParsed.Gga(null, null, 0, 0, null, null, null, 0L))
+        val s = store.status.value
+        assertEquals(FixQuality.NoFix, s.fix)
+        assertEquals(null, s.latitude)
+        assertEquals(null, s.longitude)
+        assertEquals(null, s.sigmaH)
+    }
+
+    @Test
     fun `Gst sigma values land in sigmaN sigmaE sigmaH`() = runTest {
         val store = GnssStatusStore()
         store.submit(NmeaParsed.Gst(sigmaLat = 0.012, sigmaLon = 0.009, sigmaAlt = 0.025))

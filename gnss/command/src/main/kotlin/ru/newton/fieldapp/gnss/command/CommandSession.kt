@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,13 +54,22 @@ class CommandSession(
     private val parentJob = SupervisorJob()
     private val scope = CoroutineScope(parentJob + ioDispatcher)
     private val sendMutex = Mutex()
-    private val replyChannel = Channel<String>(capacity = Channel.UNLIMITED)
+
+    // Bounded with DROP_OLDEST as a backstop: only genuine command-port lines
+    // are enqueued (NMEA is filtered out below) and the channel is drained
+    // before every send, so it normally holds 0-1 entries. The cap guards
+    // against a runaway burst of receiver chatter leaking memory over a long day.
+    private val replyChannel = Channel<String>(
+        capacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private val aggregator = CommandLineAggregator()
 
     private val _state = MutableStateFlow<CommandSessionState>(CommandSessionState.Idle)
     val state: StateFlow<CommandSessionState> = _state.asStateFlow()
 
     private var readerJob: Job? = null
+    private var linkJob: Job? = null
 
     /** Start consuming bytes from the transport. Idempotent. */
     fun start() {
@@ -67,11 +77,28 @@ class CommandSession(
         readerJob = scope.launch {
             transport.incoming.collect { chunk ->
                 aggregator.feed(chunk).forEach { line ->
-                    // Log every command-port line (NMEA `$…` excluded) so the
-                    // diagnostics log shows exactly what the receiver replies
-                    // during a handshake — invaluable when AT appears to hang.
-                    if (line.isNotBlank() && !line.startsWith("$")) log.cmd("← $line")
+                    // Only command-port lines belong in the reply channel. NMEA
+                    // frames (`$…`) and blanks would otherwise accumulate by the
+                    // hundred-thousand over a field day and bury the OK tokens.
+                    if (line.isBlank() || line.startsWith("$")) return@forEach
+                    // Log so the diagnostics view shows exactly what the receiver
+                    // replies during a handshake — invaluable when AT appears to hang.
+                    log.cmd("← $line")
                     replyChannel.trySend(line)
+                }
+            }
+        }
+        linkJob = scope.launch {
+            transport.linkState.collect { link ->
+                // A BT drop (receiver power-cycle, range loss) wipes the receiver's
+                // command mode. If we keep `Ready`, the next Apply skips handshake()
+                // and fires commands into a port that silently ignores them. Force
+                // a fresh handshake by returning to Idle. See ApplyReceiverConfigUseCase.
+                if (link !is LinkState.Connected && _state.value == CommandSessionState.Ready) {
+                    log.cmd("Link left Connected ($link) — resetting command session to Idle")
+                    aggregator.reset()
+                    while (replyChannel.tryReceive().isSuccess) Unit
+                    _state.value = CommandSessionState.Idle
                 }
             }
         }
@@ -81,6 +108,8 @@ class CommandSession(
     fun stop() {
         readerJob?.cancel()
         readerJob = null
+        linkJob?.cancel()
+        linkJob = null
         aggregator.reset()
         // Drain leftover replies — they belong to the previous session.
         while (replyChannel.tryReceive().isSuccess) Unit
@@ -155,6 +184,12 @@ class CommandSession(
     }
 
     private suspend fun sendInternal(command: String) {
+        // Drain stale lines before writing so this command is matched against
+        // its OWN reply. Without this, a late `OK!` from a previously timed-out
+        // command sits in the channel and gets consumed by the next send —
+        // shifting every acknowledgement off-by-one for the rest of the session.
+        // Safe under sendMutex: no other send can be enqueuing here concurrently.
+        while (replyChannel.tryReceive().isSuccess) Unit
         log.cmd("→ $command")
         transport.write((command + "\r\n").toByteArray(Charsets.US_ASCII))
     }

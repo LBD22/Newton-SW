@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import ru.newton.fieldapp.gnss.data.FixQuality
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +51,7 @@ class SurveyPreferences
                 prefs[KEY_CODE_LIBRARY] = next.codeLibrary.joinToString(SEPARATOR)
                 prefs[KEY_TILT_ENABLED] = next.tiltCorrectionEnabled
                 prefs[KEY_POLE_HEIGHT] = next.poleHeightM.coerceIn(0.0, 5.0)
+                prefs[KEY_MIN_FIX] = next.minFix.toToken()
             }
         }
 
@@ -65,6 +67,7 @@ class SurveyPreferences
                 ?: DEFAULT_CODE_LIBRARY,
             tiltCorrectionEnabled = this[KEY_TILT_ENABLED] ?: DEFAULT_TILT_ENABLED,
             poleHeightM = this[KEY_POLE_HEIGHT] ?: DEFAULT_POLE_HEIGHT,
+            minFix = fixFromToken(this[KEY_MIN_FIX]),
         )
 
         private companion object {
@@ -76,6 +79,7 @@ class SurveyPreferences
             val KEY_CODE_LIBRARY = stringPreferencesKey("code_library")
             val KEY_TILT_ENABLED = booleanPreferencesKey("tilt_enabled")
             val KEY_POLE_HEIGHT = doublePreferencesKey("pole_height_m")
+            val KEY_MIN_FIX = stringPreferencesKey("min_fix")
             const val DEFAULT_MIN_EPOCHS = 10
             const val DEFAULT_TOL_H = 0.030
             const val DEFAULT_TOL_V = 0.050
@@ -97,6 +101,24 @@ class SurveyPreferences
         }
     }
 
+/**
+ * Persist the minimum-fix gate as a stable token. PPP/NoFix are never offered
+ * as a gate value, so they round-trip to the safe default (FixedRtk).
+ */
+private fun FixQuality.toToken(): String = when (this) {
+    FixQuality.Single -> "SINGLE"
+    FixQuality.DGnss -> "DGNSS"
+    FixQuality.FloatRtk -> "FLOAT_RTK"
+    else -> "FIXED_RTK"
+}
+
+private fun fixFromToken(token: String?): FixQuality = when (token) {
+    "SINGLE" -> FixQuality.Single
+    "DGNSS" -> FixQuality.DGnss
+    "FLOAT_RTK" -> FixQuality.FloatRtk
+    else -> FixQuality.FixedRtk
+}
+
 data class SurveyDefaults(
     val minEpochs: Int,
     val toleranceHorizontalM: Double,
@@ -108,11 +130,23 @@ data class SurveyDefaults(
     /** Recently-used codes shown as quick-tap chips on PointSurveyScreen. */
     val codeLibrary: List<String> = emptyList(),
     /**
-     * When true and the receiver's IMU is valid, [TiltCorrector] reduces each
-     * GNSS epoch to the pole tip during point survey. Off by default —
-     * surveyors who don't use a tilt-capable receiver should see no change.
+     * When true and the receiver's IMU is valid, [TiltCorrector] additionally
+     * removes the horizontal lean (pole tilted off vertical). Off by default —
+     * surveyors without a tilt-capable receiver should keep a vertical pole.
+     * Note: the [poleHeightM] vertical reduction happens regardless of this flag.
      */
     val tiltCorrectionEnabled: Boolean = false,
-    /** Pole length in metres (antenna phase centre to ground tip). */
+    /**
+     * Antenna phase-centre height above the ground mark, metres. Subtracted from
+     * the stored height of EVERY survey point (vertical-pole assumption), and
+     * used as the pole length for tilt geometry when [tiltCorrectionEnabled].
+     */
     val poleHeightM: Double = 2.0,
+    /**
+     * Minimum fix quality an epoch must reach to be stored. Defaults to
+     * [FixQuality.FixedRtk] — a professional surveying product must not silently
+     * average autonomous (metre-level) or float (decimetre) epochs into a point.
+     * Lower it deliberately for reconnaissance/DGNSS work.
+     */
+    val minFix: FixQuality = FixQuality.FixedRtk,
 )

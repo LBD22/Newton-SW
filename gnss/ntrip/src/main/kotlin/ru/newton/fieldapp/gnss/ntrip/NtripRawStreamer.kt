@@ -18,6 +18,8 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
 /**
@@ -45,27 +47,56 @@ class NtripRawStreamer(
     private val _state = MutableStateFlow<NtripState>(NtripState.Idle)
     val state: StateFlow<NtripState> = _state.asStateFlow()
 
-    fun resetState() { _state.value = NtripState.Idle }
+    // Bumped on every new stream and on resetState(). A stream only publishes
+    // state while its generation is current, so a cancelled stream that emits
+    // one last "Reconnecting…" can't clobber a freshly started stream or the
+    // Idle set by stop() (field symptom: UI stuck on «Переподключение…»).
+    private val generation = AtomicInteger(0)
+
+    // The socket of the live connection, exposed so a profile switch / stop can
+    // close it and unblock the 30 s blocking read immediately instead of waiting
+    // out soTimeout while a second login overlaps and the VRS kicks us.
+    @Volatile
+    private var activeSocket: Socket? = null
+
+    fun resetState() {
+        generation.incrementAndGet()
+        _state.value = NtripState.Idle
+    }
+
+    /** Force-close the current connection so a blocking read returns at once. */
+    fun closeActiveSocket() {
+        runCatching { activeSocket?.close() }
+    }
+
+    private fun publish(gen: Int, state: NtripState) {
+        if (gen == generation.get()) _state.value = state
+    }
 
     fun streamMountpoint(profile: NtripProfile): Flow<ByteArray> = flow {
+        val gen = generation.incrementAndGet()
         var attempt = 0
         var bytesTotal = 0L
         while (true) {
             attempt++
-            _state.value = NtripState.Connecting(profile.mountpoint, attempt)
+            publish(gen, NtripState.Connecting(profile.mountpoint, attempt))
             val socket = openSocket(profile)
             if (socket == null) {
                 val delayMs = backoffMs(attempt)
-                _state.value = NtripState.Reconnecting(profile.mountpoint, delayMs)
+                publish(gen, NtripState.Reconnecting(profile.mountpoint, delayMs))
                 log.ntrip("NTRIP raw connect ${profile.host}:${profile.port} failed; retry in ${delayMs}ms")
                 delay(delayMs)
                 continue
             }
+            activeSocket = socket
             var bytesThisConn = 0L
             var noDataReason: String? = null
             try {
                 val auth = if (profile.login.isNotEmpty()) {
-                    Credentials.basic(profile.login, profile.password)
+                    // UTF-8, not OkHttp's default ISO-8859-1: a Cyrillic password
+                    // would otherwise be mangled to '?' and rejected as a 401 that
+                    // looks like "wrong password" with correct credentials.
+                    Credentials.basic(profile.login, profile.password, Charsets.UTF_8)
                 } else {
                     null
                 }
@@ -97,16 +128,18 @@ class NtripRawStreamer(
                 // table into the receiver as if it were RTCM. Treat it as a fatal
                 // config error so the user picks a valid mountpoint instead.
                 if (statusLine.startsWith("SOURCETABLE", ignoreCase = true)) {
-                    _state.value = NtripState.Failed(wrongMountpointMessage(profile.mountpoint))
+                    publish(gen, NtripState.Failed(wrongMountpointMessage(profile.mountpoint)))
                     log.ntrip("NTRIP raw: SOURCETABLE for /${profile.mountpoint} — mountpoint not found")
+                    activeSocket = null
                     socket.closeQuietly()
                     return@flow
                 }
                 // Casters reply either "ICY 200 OK" (Ntrip/1.0) or "HTTP/1.1 200 OK" (Ntrip/2.0).
                 if (!statusLine.contains("200")) {
                     val httpCode = statusLine.split(" ").getOrNull(1)?.toIntOrNull()
-                    _state.value = NtripState.Failed(statusLine, httpCode = httpCode)
+                    publish(gen, NtripState.Failed(statusLine, httpCode = httpCode))
                     log.ntrip("NTRIP raw: $statusLine — aborting (likely auth/mountpoint)")
+                    activeSocket = null
                     socket.closeQuietly()
                     return@flow
                 }
@@ -123,14 +156,15 @@ class NtripRawStreamer(
                         }
                     }
                     if (isSourceTable) {
-                        _state.value = NtripState.Failed(wrongMountpointMessage(profile.mountpoint))
+                        publish(gen, NtripState.Failed(wrongMountpointMessage(profile.mountpoint)))
                         log.ntrip("NTRIP raw: gnss/sourcetable for /${profile.mountpoint} — mountpoint not found")
+                        activeSocket = null
                         socket.closeQuietly()
                         return@flow
                     }
                 }
                 attempt = 1 // reset backoff on a successful open
-                _state.value = NtripState.AwaitingCorrections(profile.mountpoint)
+                publish(gen, NtripState.AwaitingCorrections(profile.mountpoint))
 
                 // Spawn the upstream GPGGA writer; cancellation propagates from caller.
                 coroutineScope {
@@ -142,10 +176,13 @@ class NtripRawStreamer(
                             if (read <= 0) break
                             bytesThisConn += read
                             bytesTotal += read
-                            _state.value = NtripState.Streaming(
-                                mountpoint = profile.mountpoint,
-                                bytesReceived = bytesTotal,
-                                lastByteAtMs = System.currentTimeMillis(),
+                            publish(
+                                gen,
+                                NtripState.Streaming(
+                                    mountpoint = profile.mountpoint,
+                                    bytesReceived = bytesTotal,
+                                    lastByteAtMs = System.currentTimeMillis(),
+                                ),
                             )
                             emit(buffer.copyOf(read))
                         }
@@ -163,19 +200,26 @@ class NtripRawStreamer(
                 if (bytesThisConn == 0L) noDataReason = noCorrectionsMessage()
                 log.ntrip("NTRIP raw read timeout (${bytesThisConn}B this conn): ${t.message}")
             } catch (t: Throwable) {
+                // A deliberate stop/profile-switch closes the socket under us; let
+                // cancellation propagate cleanly rather than logging it as an error.
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 log.ntrip("NTRIP raw stream error: ${t.message}", t)
             } finally {
+                activeSocket = null
                 socket.closeQuietly()
             }
             val delayMs = backoffMs(attempt)
             // Keep the diagnostic visible during the wait instead of overwriting
             // it with a bare "Reconnecting…" — otherwise the user just sees an
             // endless connect loop with no explanation (the field-report symptom).
-            _state.value = if (noDataReason != null) {
-                NtripState.Failed(noDataReason)
-            } else {
-                NtripState.Reconnecting(profile.mountpoint, delayMs)
-            }
+            publish(
+                gen,
+                if (noDataReason != null) {
+                    NtripState.Failed(noDataReason)
+                } else {
+                    NtripState.Reconnecting(profile.mountpoint, delayMs)
+                },
+            )
             delay(delayMs)
         }
     }
@@ -215,8 +259,13 @@ class NtripRawStreamer(
         // a position from us) surfaces as a SocketTimeoutException instead of
         // blocking input.read forever and looking "connected" with no data.
         if (profile.useTls) {
-            sslSocketFactory.createSocket(plain, profile.host, profile.port, true).also {
+            (sslSocketFactory.createSocket(plain, profile.host, profile.port, true) as SSLSocket).also {
+                // A raw SSLSocket validates the cert chain but NOT the hostname,
+                // so a cert valid for any host would pass and a MITM could capture
+                // the Basic credentials. Enable HTTPS endpoint identification.
+                it.sslParameters = it.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
                 it.soTimeout = READ_TIMEOUT_MS
+                it.startHandshake()
             }
         } else {
             plain.also { it.soTimeout = READ_TIMEOUT_MS }

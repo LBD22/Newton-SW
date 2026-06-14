@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.os.SystemClock
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,13 @@ class BluetoothSppTransport(
     private val parentJob = SupervisorJob()
     private val scope = CoroutineScope(parentJob + Dispatchers.IO)
     private val socketMutex = Mutex()
+
+    // Serialises every outbound write on the one shared socket. RTCM chunks from
+    // NTRIP (@CommandSpp) and Newton text commands reach write() concurrently;
+    // without this lock the RFCOMM stack can splice an `AT\r\n` into the middle
+    // of an RTCM frame — corrupting both the correction and the command. See
+    // docs/protocol-newton.md § Bluetooth channel (one socket).
+    private val writeMutex = Mutex()
 
     @Volatile private var socket: BluetoothSocket? = null
 
@@ -98,9 +106,11 @@ class BluetoothSppTransport(
         check(_linkState.value is LinkState.Connected && active != null) {
             "write() called while link is ${_linkState.value}"
         }
-        withContext(Dispatchers.IO) {
-            active.outputStream.write(bytes)
-            active.outputStream.flush()
+        writeMutex.withLock {
+            withContext(Dispatchers.IO) {
+                active.outputStream.write(bytes)
+                active.outputStream.flush()
+            }
         }
     }
 
@@ -109,28 +119,47 @@ class BluetoothSppTransport(
         var attempt = 1
         while (scope.isActive && requestedAddress == deviceAddress) {
             _linkState.value = LinkState.Connecting(attempt)
-            val opened = runCatching { openSocket(deviceAddress) }.getOrElse { t ->
+            val opened = try {
+                openSocket(deviceAddress)
+            } catch (se: SecurityException) {
+                // BLUETOOTH_CONNECT was revoked mid-run (or "Nearby devices"
+                // auto-reset). Retrying can never succeed without the user
+                // re-granting, so stop the loop instead of spinning the radio
+                // forever at the 30 s ceiling.
+                log.bt("connect aborted: Bluetooth permission missing", se)
+                _linkState.value = LinkState.Error(
+                    "Нет разрешения Bluetooth — выдайте доступ к устройствам рядом",
+                    se,
+                )
+                return
+            } catch (t: Throwable) {
                 log.bt("connect attempt $attempt failed: ${t.message}", t)
                 _linkState.value = LinkState.Error(t.message ?: "Open failed", t)
                 delay(backoffMs(attempt))
                 attempt = (attempt + 1).coerceAtMost(MAX_BACKOFF_ATTEMPTS)
                 continue
             }
-            attempt = 1
             socket = opened
             _linkState.value = LinkState.Connected(
                 deviceName = opened.remoteDevice?.name ?: deviceAddress,
                 rssi = null,
             )
             log.bt("connected to $deviceAddress")
+            val connectedAtMs = SystemClock.elapsedRealtime()
             runReadLoop(opened)
 
             // Read loop returned → either we got cancelled (disconnect) or the
             // socket faulted. If the user still wants this address, loop back.
             socketMutex.withLock { closeSocketLocked() }
             if (requestedAddress != deviceAddress) return
-            _linkState.value = LinkState.Connecting(1)
-            delay(backoffMs(1))
+            // Only reset backoff if the link actually stayed up. A socket that
+            // connects then dies within STABLE_CONNECTION_MS — receiver mid-boot
+            // after `config reset`, marginal range — must keep escalating instead
+            // of churning connect/fail every ~1 s (radio drain, peer blacklist).
+            val stayedUp = SystemClock.elapsedRealtime() - connectedAtMs >= STABLE_CONNECTION_MS
+            attempt = if (stayedUp) 1 else (attempt + 1).coerceAtMost(MAX_BACKOFF_ATTEMPTS)
+            _linkState.value = LinkState.Connecting(attempt)
+            delay(backoffMs(attempt))
         }
     }
 
@@ -157,7 +186,13 @@ class BluetoothSppTransport(
             }
         } catch (e: IOException) {
             log.bt("read loop interrupted: ${e.message}", e)
-            _linkState.value = LinkState.Error(e.message ?: "Read failed", e)
+            // Only surface an error if this address is still wanted. A deliberate
+            // disconnect() nulls requestedAddress and closes the socket, which
+            // also throws IOException here — we must not flap the UI to Error
+            // after a clean user-initiated disconnect.
+            if (requestedAddress != null) {
+                _linkState.value = LinkState.Error(e.message ?: "Read failed", e)
+            }
         }
     }
 
@@ -177,6 +212,11 @@ class BluetoothSppTransport(
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
         private const val READ_CHUNK = 1024
         private const val MAX_BACKOFF_ATTEMPTS = 6 // 1,2,4,8,16,30s ceiling
+
+        // Minimum time a socket must stay up before we treat the next drop as a
+        // "fresh" failure and reset backoff. Below this it's a flapping link and
+        // we keep escalating.
+        private const val STABLE_CONNECTION_MS = 10_000L
 
         private fun backoffMs(attempt: Int): Long {
             val base = 1_000L shl (attempt - 1).coerceAtLeast(0)

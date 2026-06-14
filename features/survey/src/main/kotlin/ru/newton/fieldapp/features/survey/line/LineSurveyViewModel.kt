@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.takeWhile
@@ -21,6 +22,7 @@ import ru.newton.fieldapp.domain.model.PointSource
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
+import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -55,7 +57,11 @@ class LineSurveyViewModel
             collectingJob?.cancel()
             val name = currentLineName()
             collectingJob = viewModelScope.launch {
-                val target = preferences.defaults.first().minEpochs
+                val prefs = preferences.defaults.first()
+                val target = prefs.minEpochs
+                val minFix = prefs.minFix
+                val poleH = prefs.poleHeightM
+                val tiltOn = prefs.tiltCorrectionEnabled
                 val samples = mutableListOf<GnssStatus>()
                 _state.value = LineSurveyState.Collecting(
                     lineName = name,
@@ -65,13 +71,23 @@ class LineSurveyViewModel
                     currentFix = FixQuality.NoFix,
                 )
                 store.status
+                    // One sample per GGA epoch (see PointSurveyViewModel); the gate
+                    // rejects stale / sub-threshold-fix epochs from the vertex average.
+                    .distinctUntilChangedBy { it.timestampUtc to it.isStale }
                     .takeWhile { samples.size < target }
                     .collect { status ->
-                        if (status.fix == FixQuality.NoFix || status.latitude == null) {
+                        if (status.isStale || status.latitude == null || !status.fix.isAtLeast(minFix)) {
                             updateCollecting(name, samples.size, target, status.fix)
                             return@collect
                         }
-                        samples += status
+                        // Reduce the antenna fix to the ground mark (height always;
+                        // lean too when tilt is on). Skip if tilt requested but IMU unusable.
+                        val sample = TiltCorrector.reduceToGround(status, poleH, tiltOn)
+                        if (sample == null) {
+                            updateCollecting(name, samples.size, target, status.fix)
+                            return@collect
+                        }
+                        samples += sample
                         updateCollecting(name, samples.size, target, status.fix)
                     }
                 if (samples.isEmpty()) {

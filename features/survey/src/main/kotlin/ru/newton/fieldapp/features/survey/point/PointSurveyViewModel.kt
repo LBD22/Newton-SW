@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.takeWhile
@@ -50,6 +51,7 @@ class PointSurveyViewModel
                 val target = prefsSnapshot.minEpochs
                 val tiltOn = prefsSnapshot.tiltCorrectionEnabled
                 val poleH = prefsSnapshot.poleHeightM
+                val minFix = prefsSnapshot.minFix
                 val samples = mutableListOf<GnssStatus>()
                 _state.value = PointSurveyState.Collecting(
                     collected = 0,
@@ -58,12 +60,21 @@ class PointSurveyViewModel
                     lastEpochAtUtc = 0L,
                 )
                 store.status
+                    // One sample per GGA epoch: timestampUtc only advances when a
+                    // fresh GGA lands, so this collapses the 4-10 duplicate
+                    // emissions/sec from GST/GSA/GSV that otherwise inflate the
+                    // epoch count and corrupt the σ estimate. The isStale key lets
+                    // a watchdog-driven stale flip through so we stop sampling.
+                    .distinctUntilChangedBy { it.timestampUtc to it.isStale }
                     .takeWhile { samples.size < target }
                     .collect { status ->
-                        // Skip epochs without a fix. We still update the UI's
-                        // currentFix indicator so the surveyor sees why nothing
-                        // is happening when they're under canopy.
-                        if (status.fix == FixQuality.NoFix || status.latitude == null) {
+                        // Gate: only average live epochs that reach the configured
+                        // minimum fix. Stale (NMEA stalled), missing position, or
+                        // sub-threshold fix epochs update the indicator so the
+                        // surveyor sees why nothing is happening, but are NOT
+                        // averaged in — a Single/Float epoch must never dilute a
+                        // Fixed-RTK point.
+                        if (status.isStale || status.latitude == null || !status.fix.isAtLeast(minFix)) {
                             _state.value = PointSurveyState.Collecting(
                                 collected = samples.size,
                                 target = target,
@@ -72,12 +83,21 @@ class PointSurveyViewModel
                             )
                             return@collect
                         }
-                        // When tilt-correction is on, reduce each epoch to the
-                        // pole tip; the corrector is a no-op on epochs whose
-                        // IMU isn't valid, so a brief fall-back to vertical-pole
-                        // numbers only happens when the receiver actually
-                        // says so.
-                        val sample = if (tiltOn) TiltCorrector.apply(status, poleH) else status
+                        // Reduce the antenna fix to the ground mark. The height
+                        // reduction by pole length ALWAYS happens (vertical-pole
+                        // assumption when tilt is off); with tilt on we also remove
+                        // the lean and SKIP epochs where the IMU isn't usable rather
+                        // than mixing an uncorrected one into the average.
+                        val sample = TiltCorrector.reduceToGround(status, poleH, tiltOn)
+                        if (sample == null) {
+                            _state.value = PointSurveyState.Collecting(
+                                collected = samples.size,
+                                target = target,
+                                currentFix = status.fix,
+                                lastEpochAtUtc = status.timestampUtc,
+                            )
+                            return@collect
+                        }
                         samples += sample
                         _state.value = PointSurveyState.Collecting(
                             collected = samples.size,

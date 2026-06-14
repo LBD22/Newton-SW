@@ -119,6 +119,7 @@ private fun ActiveBlock(state: StakeoutState.Active, onSave: () -> Unit) {
     DirectionArrow(
         targetAzimuthDeg = state.vector.azimuthDeg,
         deviceHeadingDeg = deviceHeadingDeg,
+        headingCorrectionDeg = state.headingCorrectionDeg,
         withinTolerance = withinTolerance,
         modifier = Modifier
             .fillMaxWidth()
@@ -209,22 +210,25 @@ private fun OnTargetBanner(toleranceM: Double) {
  * Compass-style arrow centred in a disc, rotated so the tip points at the
  * stakeout target relative to which way the phone is facing.
  *
- * Rotation = `targetAzimuth - deviceHeading`. Both are in geographic degrees
- * (0 = N, clockwise). When the surveyor turns to face the target, the arrow
- * settles to "up". When they're on target ([withinTolerance]), the arrow is
- * replaced by a static green disc — the user looks down at the pole, not at
- * the screen.
+ * Rotation = `targetAzimuth - correctedDeviceHeading`. The target azimuth is in
+ * the grid (or true, for geographic) frame; the raw device heading is MAGNETIC,
+ * so [headingCorrectionDeg] (declination − convergence) lifts it into the same
+ * frame. Without it the arrow is off by the local declination (10-25° in Russia)
+ * and the surveyor walks a curve. On target ([withinTolerance]) the arrow is
+ * replaced by a static green disc — the user looks down at the pole.
  */
 @Composable
 private fun DirectionArrow(
     targetAzimuthDeg: Double,
     deviceHeadingDeg: Float,
+    headingCorrectionDeg: Double,
     withinTolerance: Boolean,
     modifier: Modifier = Modifier,
 ) {
     // Bearing relative to phone heading — what the surveyor needs to walk
     // toward. CompassRose handles all the rose / ticks / arrow rendering.
-    val bearing = ((targetAzimuthDeg.toFloat() - deviceHeadingDeg) + 360f) % 360f
+    val correctedHeading = deviceHeadingDeg + headingCorrectionDeg.toFloat()
+    val bearing = ((targetAzimuthDeg.toFloat() - correctedHeading) + 360f) % 360f
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         ru.newton.fieldapp.core.ui.components.CompassRose(
             bearing = bearing,

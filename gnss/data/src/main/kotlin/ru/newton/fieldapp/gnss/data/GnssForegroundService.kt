@@ -15,10 +15,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.newton.fieldapp.core.bluetooth.DataSpp
 import ru.newton.fieldapp.core.bluetooth.SppTransport
 import ru.newton.fieldapp.core.logging.AppLog
@@ -63,28 +64,34 @@ class GnssForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START -> {
-                val mac = intent.getStringExtra(EXTRA_DEVICE_MAC)
-                if (mac.isNullOrBlank()) {
-                    log.bt("Service start without device MAC — stopping")
-                    stopSelf()
-                } else {
-                    startPipeline(mac)
-                }
-            }
-            ACTION_STOP -> {
-                stopPipeline()
-                stopSelf()
-            }
+        if (intent?.action == ACTION_STOP) {
+            stopPipeline(awaitDisconnect = true)
+            stopSelf()
+            return START_NOT_STICKY
         }
-        return START_STICKY
+        // ACTION_START, or a system restart: START_REDELIVER_INTENT hands the
+        // original ACTION_START intent (with the MAC) back to us, so a kill
+        // mid-survey resumes the pipeline. A bare restart can still pass null.
+        val mac = intent?.getStringExtra(EXTRA_DEVICE_MAC)
+        if (mac.isNullOrBlank()) {
+            // We were (re)started without a device. We MUST still call
+            // startForeground() within ~5 s of a startForegroundService() launch
+            // or Android crashes us with ForegroundServiceDidNotStartInTimeException;
+            // satisfy the contract, then bow out cleanly.
+            log.bt("Service start without device MAC — stopping")
+            startForegroundCompat(buildNotification(label = "Нет устройства"))
+            stopPipeline(awaitDisconnect = true)
+            stopSelf()
+        } else {
+            startPipeline(mac)
+        }
+        return START_REDELIVER_INTENT
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        stopPipeline()
+        stopPipeline(awaitDisconnect = true)
         scope.cancel()
         super.onDestroy()
     }
@@ -97,13 +104,16 @@ class GnssForegroundService : Service() {
             launch { spp.connect(mac) }
 
             // CommandSession starts reading from the shared transport regardless
-            // of link state (it filters by content). Handshake fires the first
-            // time the link becomes Connected — Apply triggers handshake()
-            // lazily otherwise.
+            // of link state (it filters by content). Apply triggers handshake()
+            // lazily; CommandSession resets itself to Idle whenever the link
+            // leaves Connected, so a reconnect always re-handshakes before use.
             commandSession.start()
 
             launch {
-                spp.incoming.collectLatest { chunk ->
+                // collect (not collectLatest): every chunk must be aggregated;
+                // collectLatest would cancel mid-chunk the moment the body gains
+                // a suspension point, silently dropping NMEA lines under load.
+                spp.incoming.collect { chunk ->
                     val lines = aggregator.feed(chunk)
                     for (line in lines) statusStore.submit(dispatcher.dispatch(line))
                 }
@@ -115,14 +125,21 @@ class GnssForegroundService : Service() {
         }
     }
 
-    private fun stopPipeline() {
+    private fun stopPipeline(awaitDisconnect: Boolean = false) {
         pipelineJob?.cancel()
         pipelineJob = null
         statusStore.reset()
         aggregator.reset()
         commandSession.stop()
-        scope.launch {
-            runCatching { spp.disconnect() }
+        if (awaitDisconnect) {
+            // onDestroy/STOP path: `scope` is about to be cancelled, so a
+            // fire-and-forget launch would be cancelled before disconnect() runs,
+            // leaving the singleton transport reconnecting forever as a zombie.
+            // Disconnect synchronously with a short cap so we don't block the
+            // main thread for long.
+            runBlocking { withTimeoutOrNull(800) { runCatching { spp.disconnect() } } }
+        } else {
+            scope.launch { runCatching { spp.disconnect() } }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)

@@ -66,7 +66,12 @@ class NtripForwarder(
 
     fun start(profile: NtripProfile) {
         if (activeProfile?.id == profile.id && streamJob?.isActive == true) return
+        // Cancel AND force-close the old socket so the previous TCP connection
+        // tears down immediately. Otherwise it lingers up to the 30 s read timeout
+        // and the caster sees two logins with the same credentials — VRS casters
+        // reject the second, so the *new* profile inexplicably fails to stream.
         streamJob?.cancel()
+        streamer.closeActiveSocket()
         activeProfile = profile
         streamJob = scope.launch {
             log.ntrip("Forwarding ${profile.host}/${profile.mountpoint} → SPP (GPGGA upstream on)")
@@ -84,6 +89,7 @@ class NtripForwarder(
 
     fun stop() {
         streamJob?.cancel()
+        streamer.closeActiveSocket()
         streamJob = null
         activeProfile = null
         streamer.resetState()

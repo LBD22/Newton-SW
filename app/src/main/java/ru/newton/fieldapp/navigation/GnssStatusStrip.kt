@@ -85,11 +85,16 @@ private fun GnssStatusStripContent(snapshot: StatusStripSnapshot, modifier: Modi
             text = "SAT ${snapshot.satsUsed}",
             icon = Icons.Default.SatelliteAlt,
         )
+        // When the snapshot is stale (NMEA stalled — link drop, command mode,
+        // receiver hiccup) the fix label and coordinates are the LAST good
+        // values, not live. Grey the chip and flag it so the surveyor doesn't
+        // trust a frozen green "FIX".
+        val fixTint = if (snapshot.isStale) fixColors.noFix else tintForFix
         NewtonStatusPill(
-            text = describeFix(snapshot.fix),
+            text = if (snapshot.isStale) "${describeFix(snapshot.fix)} · нет данных" else describeFix(snapshot.fix),
             icon = Icons.Default.GpsFixed,
-            background = tintForFix.copy(alpha = 0.16f),
-            contentColor = tintForFix,
+            background = fixTint.copy(alpha = 0.16f),
+            contentColor = fixTint,
         )
         timeText?.let {
             NewtonStatusPill(
@@ -169,6 +174,7 @@ data class StatusStripSnapshot(
     val correctionAgeSec: Double?,
     val btLinked: Boolean,
     val timestampUtc: Long,
+    val isStale: Boolean,
     val phoneBatteryPct: Int,
     /** DevHandbook §6.4 — number of commands waiting for Apply. */
     val pendingCommandCount: Int,
@@ -186,6 +192,7 @@ data class StatusStripSnapshot(
             correctionAgeSec = status.correctionAgeSec,
             btLinked = linkState is LinkState.Connected,
             timestampUtc = status.timestampUtc,
+            isStale = status.isStale,
             phoneBatteryPct = phoneBattery,
             pendingCommandCount = pendingCommandCount,
         )
@@ -218,6 +225,7 @@ class GnssStatusStripViewModel
                 correctionAgeSec = null,
                 btLinked = false,
                 timestampUtc = 0L,
+                isStale = false,
                 phoneBatteryPct = -1,
                 pendingCommandCount = 0,
             ),

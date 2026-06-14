@@ -1,9 +1,15 @@
 package ru.newton.fieldapp.gnss.data
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import ru.newton.fieldapp.gnss.data.parsers.NmeaParsed
 import ru.newton.fieldapp.gnss.data.parsers.SatelliteInView
 import javax.inject.Inject
@@ -34,6 +40,24 @@ class GnssStatusStore
         // batch lands. Skyplot UI sees full snapshots, never half-batches.
         private val gsvBuffer = mutableMapOf<String, MutableList<SatelliteInView>>()
         private val gsvLastMessage = mutableMapOf<String, Int>()
+
+        // Lives for the whole app; the singleton never goes away. Watches the
+        // snapshot age and flips `isStale` when GGA stops arriving, so the UI and
+        // survey logic can tell "frozen last position" from "live position".
+        private val watchdogScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        init {
+            watchdogScope.launch {
+                while (isActive) {
+                    delay(STALE_CHECK_INTERVAL_MS)
+                    val snapshot = _status.value
+                    val ageMs = System.currentTimeMillis() - snapshot.timestampUtc
+                    if (snapshot.timestampUtc != 0L && !snapshot.isStale && ageMs > STALE_THRESHOLD_MS) {
+                        _status.update { if (it.isStale) it else it.copy(isStale = true) }
+                    }
+                }
+            }
+        }
 
         /** Apply one NMEA parse result. Unknown/error cases are no-ops here — the
          *  dispatcher logs them; the store keeps the last good status. */
@@ -85,16 +109,29 @@ class GnssStatusStore
         /** Drop accumulated state — used on disconnect. */
         fun reset() { _status.value = GnssStatus.initial() }
 
-        private fun GnssStatus.applyGga(parsed: NmeaParsed.Gga): GnssStatus = copy(
-            fix = mapFixQuality(parsed.fixQuality),
-            latitude = parsed.latitude,
-            longitude = parsed.longitude,
-            ellipsoidalHeight = parsed.ellipsoidalHeight,
-            satsUsed = parsed.satsUsed,
-            hdop = parsed.hdop ?: hdop,
-            correctionAgeSec = parsed.correctionAgeSec,
-            timestampUtc = System.currentTimeMillis(),
-        )
+        private fun GnssStatus.applyGga(parsed: NmeaParsed.Gga): GnssStatus {
+            val fix = mapFixQuality(parsed.fixQuality)
+            val noFix = fix == FixQuality.NoFix || parsed.latitude == null
+            return copy(
+                fix = fix,
+                latitude = parsed.latitude,
+                longitude = parsed.longitude,
+                ellipsoidalHeight = parsed.ellipsoidalHeight,
+                geoidSeparation = parsed.geoidSeparation,
+                satsUsed = parsed.satsUsed,
+                hdop = parsed.hdop ?: hdop,
+                correctionAgeSec = parsed.correctionAgeSec,
+                // A fresh GGA is the liveness signal — its arrival clears staleness.
+                isStale = false,
+                timestampUtc = System.currentTimeMillis(),
+                // Fix lost → drop the accuracy figures too. Otherwise the last
+                // cm-level σ from GST lingers on the strip and the surveyor reads
+                // an accuracy that no longer exists.
+                sigmaN = if (noFix) null else sigmaN,
+                sigmaE = if (noFix) null else sigmaE,
+                sigmaH = if (noFix) null else sigmaH,
+            )
+        }
 
         private fun GnssStatus.applyGst(parsed: NmeaParsed.Gst): GnssStatus = copy(
             sigmaN = parsed.sigmaLat,
@@ -132,6 +169,12 @@ class GnssStatusStore
             rollDeg = parsed.rollDeg ?: rollDeg,
             imuValid = parsed.headingDeg != null || imuValid,
         )
+
+        private companion object {
+            // Flip to stale after this long with no GGA; check at this cadence.
+            const val STALE_THRESHOLD_MS = 3_000L
+            const val STALE_CHECK_INTERVAL_MS = 1_000L
+        }
 
         private fun mapFixQuality(rawGgaField: Int): FixQuality = when (rawGgaField) {
             0 -> FixQuality.NoFix
