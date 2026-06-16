@@ -23,4 +23,10 @@ data class CorrectionSourceState(
     val gsmModemEnabled: Boolean = false,
     /** Human-readable summary of a queued UHF-radio source (`input set uhf`), if any. */
     val uhfActiveSummary: String? = null,
+    /** Profile queued for RECEIVER-Ethernet NTRIP (`input set ntripclient`), if any. */
+    val ethernetNtripActiveProfileId: Long? = null,
+    /** Summary of a queued COM-port source (`input set com<N>`), if any. */
+    val comActiveSummary: String? = null,
+    /** Summary of a queued TCP client/server source, if any. */
+    val tcpActiveSummary: String? = null,
 )

@@ -53,7 +53,11 @@ fun CorrectionSourceScreen(
         onManageProfiles = onManageProfiles,
         onSelectProfile = viewModel::onSelectProfile,
         onSelectProfileViaGsm = viewModel::onSelectProfileViaGsm,
+        onSelectProfileViaEthernet = viewModel::onSelectProfileViaEthernet,
         onSelectUhf = viewModel::onSelectUhf,
+        onSelectCom = viewModel::onSelectCom,
+        onSelectTcpClient = viewModel::onSelectTcpClient,
+        onSelectTcpServer = viewModel::onSelectTcpServer,
         onDisable = viewModel::onDisable,
     )
 }
@@ -66,7 +70,11 @@ private fun CorrectionSourceContent(
     onManageProfiles: () -> Unit,
     onSelectProfile: (Long) -> Unit,
     onSelectProfileViaGsm: (Long) -> Unit,
+    onSelectProfileViaEthernet: (Long) -> Unit,
     onSelectUhf: (Double, String, Int) -> Unit,
+    onSelectCom: (Int, Int) -> Unit,
+    onSelectTcpClient: (String, Int) -> Unit,
+    onSelectTcpServer: (Int) -> Unit,
     onDisable: () -> Unit,
 ) {
     Scaffold(
@@ -109,8 +117,10 @@ private fun CorrectionSourceContent(
                             profile = profile,
                             isActiveController = profile.id == state.activeProfileId,
                             isActiveGsm = profile.id == state.gsmNtripActiveProfileId,
+                            isActiveEthernet = profile.id == state.ethernetNtripActiveProfileId,
                             onSelectController = { onSelectProfile(profile.id) },
                             onSelectGsm = { onSelectProfileViaGsm(profile.id) },
+                            onSelectEthernet = { onSelectProfileViaEthernet(profile.id) },
                         )
                     }
                 }
@@ -126,6 +136,14 @@ private fun CorrectionSourceContent(
 
             Text("Радио (УКВ)", style = MaterialTheme.typography.titleMedium)
             UhfSourceCard(activeSummary = state.uhfActiveSummary, onSelectUhf = onSelectUhf)
+
+            Text("COM / TCP", style = MaterialTheme.typography.titleMedium)
+            ComSourceCard(activeSummary = state.comActiveSummary, onSelectCom = onSelectCom)
+            TcpSourceCard(
+                activeSummary = state.tcpActiveSummary,
+                onSelectTcpClient = onSelectTcpClient,
+                onSelectTcpServer = onSelectTcpServer,
+            )
 
             NewtonSecondaryButton(
                 onClick = onManageProfiles,
@@ -296,8 +314,10 @@ private fun ProfileCard(
     profile: NtripProfile,
     isActiveController: Boolean,
     isActiveGsm: Boolean,
+    isActiveEthernet: Boolean,
     onSelectController: () -> Unit,
     onSelectGsm: () -> Unit,
+    onSelectEthernet: () -> Unit,
 ) {
     NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -307,18 +327,20 @@ private fun ProfileCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
-            when {
-                isActiveGsm -> Text(
-                    "Активен: NTRIP через GSM приёмника",
+            val activeLabel = when {
+                isActiveGsm -> "Активен: NTRIP через GSM приёмника"
+                isActiveEthernet -> "Активен: NTRIP по Ethernet приёмника"
+                isActiveController -> "Активен: через контроллер (Bluetooth)"
+                else -> null
+            }
+            if (activeLabel != null) {
+                Text(
+                    activeLabel,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                isActiveController -> Text(
-                    "Активен: через контроллер (Bluetooth)",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     NewtonPrimaryButton(
                         onClick = onSelectGsm,
                         text = "GSM приёмника",
@@ -330,7 +352,136 @@ private fun ProfileCard(
                         modifier = Modifier.weight(1f),
                     )
                 }
+                NewtonSecondaryButton(
+                    onClick = onSelectEthernet,
+                    text = "Ethernet приёмника",
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun ComSourceCard(
+    activeSummary: String?,
+    onSelectCom: (Int, Int) -> Unit,
+) {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (activeSummary != null) {
+                Text(
+                    "В очереди: $activeSummary",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(
+                    "Поправки с внешнего устройства по последовательному порту приёмника.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                )
+            }
+            var port by remember { mutableStateOf(1) }
+            var baud by remember { mutableStateOf(115200) }
+            Text("Порт", style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(1, 2).forEach { p ->
+                    FilterChip(
+                        selected = port == p,
+                        onClick = { port = p },
+                        label = { Text("COM$p") },
+                    )
+                }
+            }
+            Text("Скорость, бод", style = MaterialTheme.typography.labelMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                listOf(9600, 19200, 38400, 57600, 115200).forEach { b ->
+                    FilterChip(
+                        selected = baud == b,
+                        onClick = { baud = b },
+                        label = { Text(b.toString()) },
+                    )
+                }
+            }
+            NewtonPrimaryButton(
+                onClick = { onSelectCom(port, baud) },
+                text = "Выбрать COM",
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TcpSourceCard(
+    activeSummary: String?,
+    onSelectTcpClient: (String, Int) -> Unit,
+    onSelectTcpServer: (Int) -> Unit,
+) {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (activeSummary != null) {
+                Text(
+                    "В очереди: $activeSummary",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(
+                    "Поправки по TCP сетью приёмника: клиент (подключиться к хосту) " +
+                        "или сервер (слушать порт).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                )
+            }
+            var serverMode by remember { mutableStateOf(false) }
+            var host by remember { mutableStateOf("") }
+            var portText by remember { mutableStateOf("8000") }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = !serverMode,
+                    onClick = { serverMode = false },
+                    label = { Text("Клиент") },
+                )
+                FilterChip(
+                    selected = serverMode,
+                    onClick = { serverMode = true },
+                    label = { Text("Сервер") },
+                )
+            }
+            if (!serverMode) {
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    label = { Text("Хост") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            OutlinedTextField(
+                value = portText,
+                onValueChange = { portText = it },
+                label = { Text("Порт") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            NewtonPrimaryButton(
+                onClick = {
+                    val p = portText.trim().toIntOrNull() ?: return@NewtonPrimaryButton
+                    if (serverMode) {
+                        onSelectTcpServer(p)
+                    } else if (host.isNotBlank()) {
+                        onSelectTcpClient(host.trim(), p)
+                    }
+                },
+                text = if (serverMode) "Выбрать TCP-сервер" else "Выбрать TCP-клиент",
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

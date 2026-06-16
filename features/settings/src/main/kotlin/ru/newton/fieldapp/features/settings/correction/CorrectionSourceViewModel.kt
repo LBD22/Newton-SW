@@ -32,6 +32,13 @@ class CorrectionSourceViewModel
                 profiles.firstOrNull { it.host == g.host && it.port == g.port && it.mountpoint == g.endpoint }
             }
             val uhf = patch.input as? InputConfig.Uhf
+            val ethernet = patch.input as? InputConfig.NtripClient
+            val ethernetProfile = ethernet?.let { n ->
+                profiles.firstOrNull { it.host == n.host && it.port == n.port && it.mountpoint == n.endpoint }
+            }
+            val com = patch.input as? InputConfig.Com
+            val tcpClient = patch.input as? InputConfig.TcpClient
+            val tcpServer = patch.input as? InputConfig.TcpServer
             CorrectionSourceState(
                 profiles = profiles,
                 activeProfileId = forwarder.activeProfile?.id,
@@ -45,6 +52,13 @@ class CorrectionSourceViewModel
                 gsmModemEnabled = patch.gsm?.enabled == true,
                 uhfActiveSummary = uhf?.let {
                     "УКВ ${it.frequencyMHz} МГц · ${it.protocol} · ${it.baudrate}"
+                },
+                ethernetNtripActiveProfileId = ethernetProfile?.id,
+                comActiveSummary = com?.let { "COM${it.index} · ${it.baudrate} бод" },
+                tcpActiveSummary = when {
+                    tcpClient != null -> "TCP-клиент ${tcpClient.host}:${tcpClient.port}"
+                    tcpServer != null -> "TCP-сервер :${tcpServer.port}"
+                    else -> null
                 },
             )
         }
@@ -96,6 +110,44 @@ class CorrectionSourceViewModel
                     ),
                 )
             }
+        }
+
+        /**
+         * Receiver-side NTRIP over the receiver's wired network (`input set
+         * ntripclient`) — for a docked/base receiver on LAN. No GSM, no controller.
+         */
+        fun onSelectProfileViaEthernet(profileId: Long) {
+            val profile = state.value.profiles.firstOrNull { it.id == profileId } ?: return
+            forwarder.stop()
+            pendingChanges.update {
+                it.copy(
+                    input = InputConfig.NtripClient(
+                        host = profile.host,
+                        port = profile.port,
+                        endpoint = profile.mountpoint,
+                        login = profile.login,
+                        password = profile.password,
+                    ),
+                )
+            }
+        }
+
+        /** Serial (COM) port as the correction input (`input set com<N> <baud>`). */
+        fun onSelectCom(index: Int, baudrate: Int) {
+            forwarder.stop()
+            pendingChanges.update { it.copy(input = InputConfig.Com(index = index, baudrate = baudrate)) }
+        }
+
+        /** TCP client correction input (`input set tcpclient <host> <port>`). */
+        fun onSelectTcpClient(host: String, port: Int) {
+            forwarder.stop()
+            pendingChanges.update { it.copy(input = InputConfig.TcpClient(host = host, port = port)) }
+        }
+
+        /** TCP server correction input (`input set tcpserver <port>`). */
+        fun onSelectTcpServer(port: Int) {
+            forwarder.stop()
+            pendingChanges.update { it.copy(input = InputConfig.TcpServer(port = port)) }
         }
 
         fun onDisable() {
