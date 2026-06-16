@@ -24,6 +24,7 @@ import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
+import ru.newton.fieldapp.features.survey.defaults.applyCalibration
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -115,7 +116,8 @@ class LineSurveyViewModel
                         ?: error("Активный проект не найден")
                     val targetCrs = CrsPresets.parse(project.crsConfig.presetId) ?: Crs.Wgs84Geo
                     accumulated.forEachIndexed { idx, vertex ->
-                        val (n, e, h) = projectVertex(vertex, targetCrs)
+                        val (rawN, rawE, rawH) = projectVertex(vertex, targetCrs)
+                        val (n, e, h) = project.crsConfig.applyCalibration(targetCrs, rawN, rawE, rawH)
                         pointRepository.save(
                             NewPoint(
                                 projectId = project.id,

@@ -14,7 +14,32 @@ data class CrsConfig(
     val geoid: GeoidConfig,
     val heightMode: HeightMode,
     val paramsJson: String? = null,
+    /**
+     * Local site calibration (4-param 2D Helmert + vertical offset) solved from
+     * control-point pairs. Null = no calibration. Applied AFTER projecting a fix
+     * into the projected CRS, on every survey save and re-projection. Default
+     * null keeps old CRS-config JSON blobs deserialising cleanly.
+     */
+    val calibration: CalibrationConfig? = null,
 )
+
+/**
+ * Persisted result of a local site calibration. The five parameters are the
+ * 2D-Helmert coefficients (a = s·cosθ, b = s·sinθ) plus translations and the
+ * vertical offset, matching `crs/LocalCalibration.Params`.
+ */
+@Serializable
+data class CalibrationConfig(
+    val a: Double,
+    val b: Double,
+    val dx: Double,
+    val dy: Double,
+    val dz: Double,
+) {
+    /** Map a projected (n, e, h) onto the local grid. Mirrors LocalCalibration.Params.apply. */
+    fun apply(n: Double, e: Double, h: Double): Triple<Double, Double, Double> =
+        Triple(a * n - b * e + dx, b * n + a * e + dy, h + dz)
+}
 
 @Serializable
 sealed interface GeoidConfig {

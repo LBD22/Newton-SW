@@ -25,6 +25,7 @@ import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
+import ru.newton.fieldapp.features.survey.defaults.applyCalibration
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
 import javax.inject.Inject
@@ -177,7 +178,8 @@ class ContinuousSurveyViewModel
                         prefix = prefs.namePrefix,
                         padding = prefs.namePadding,
                     )
-                    val (n, e, h) = projectCoords(targetCrs, sampleLat, sampleLon, sampleH)
+                    val (rawN, rawE, rawH) = projectCoords(targetCrs, sampleLat, sampleLon, sampleH)
+                    val (n, e, h) = project.crsConfig.applyCalibration(targetCrs, rawN, rawE, rawH)
                     val observation = ObservationFactory.fromSamples(
                         listOf(sample),
                         prefs.poleHeightM,

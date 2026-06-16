@@ -25,6 +25,7 @@ import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
+import ru.newton.fieldapp.features.survey.defaults.applyCalibration
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -168,13 +169,15 @@ class PointSurveyViewModel
                     )
                     // For projected CRSs we forward-project; for geographic the values
                     // are stored as N=lat, E=lon to match the ProjectedPoint shape.
-                    val (n, e, h) = when (targetCrs) {
+                    val (rawN, rawE, rawH) = when (targetCrs) {
                         is Crs.Projected -> {
                             val proj = CrsTransformer.project(geo, Crs.Wgs84Geo, targetCrs)
                             Triple(proj.northingM, proj.eastingM, proj.heightM)
                         }
                         is Crs.Geographic -> Triple(geo.latDeg, geo.lonDeg, geo.ellipsoidalHeightM)
                     }
+                    // Pull onto the customer's local grid if the project is calibrated.
+                    val (n, e, h) = project.crsConfig.applyCalibration(targetCrs, rawN, rawE, rawH)
                     pointRepository.save(
                         NewPoint(
                             projectId = project.id,

@@ -35,12 +35,62 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonInfoBadge
 import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
 import ru.newton.fieldapp.core.ui.components.NewtonSuccessButton
 import ru.newton.fieldapp.crs.LocalCalibration
+import ru.newton.fieldapp.data.preferences.ActiveProjectStore
+import ru.newton.fieldapp.domain.model.CalibrationConfig
+import ru.newton.fieldapp.domain.repository.ProjectRepository
+import javax.inject.Inject
+
+@HiltViewModel
+class CalibrationViewModel
+    @Inject
+    constructor(
+        private val activeProject: ActiveProjectStore,
+        private val projectRepository: ProjectRepository,
+    ) : ViewModel() {
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val savedCalibration: StateFlow<CalibrationConfig?> =
+            activeProject.activeId.flatMapLatest { id ->
+                if (id == null) flowOf(null) else projectRepository.observeById(id).map { it?.crsConfig?.calibration }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+        fun save(params: LocalCalibration.Params) {
+            viewModelScope.launch {
+                val id = activeProject.activeId.firstOrNull() ?: return@launch
+                projectRepository.setCalibration(
+                    id,
+                    CalibrationConfig(a = params.a, b = params.b, dx = params.dx, dy = params.dy, dz = params.dz),
+                )
+            }
+        }
+
+        fun clear() {
+            viewModelScope.launch {
+                val id = activeProject.activeId.firstOrNull() ?: return@launch
+                projectRepository.setCalibration(id, null)
+            }
+        }
+    }
 
 /**
  * Site-calibration calculator (PRJ-006B). The surveyor enters pairs of
@@ -48,14 +98,17 @@ import ru.newton.fieldapp.crs.LocalCalibration
  * [LocalCalibration.solve] and shows the resulting transform plus per-pair
  * residuals and overall RMS.
  *
- * Right now the result is informational: the surveyor uses it to validate
- * their setup or to decide whether to manually offset the project. A future
- * iteration will persist the params per project and apply them on every
- * fix automatically.
+ * «Применить к проекту» persists the params into the active project's
+ * [CalibrationConfig]; from then on every survey save and re-projection pulls
+ * coordinates onto the local grid automatically.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalibrationScreen(onBack: () -> Unit) {
+fun CalibrationScreen(
+    onBack: () -> Unit,
+    viewModel: CalibrationViewModel = hiltViewModel(),
+) {
+    val savedCalibration by viewModel.savedCalibration.collectAsStateWithLifecycle()
     val pairs = remember { mutableStateListOf<LocalCalibration.Pair2D>() }
     var result by remember { mutableStateOf<Result<LocalCalibration.Result>?>(null) }
     var addOpen by remember { mutableStateOf(false) }
@@ -134,9 +187,37 @@ fun CalibrationScreen(onBack: () -> Unit) {
                 }
             }
 
+            savedCalibration?.let { cal ->
+                val p = LocalCalibration.Params(cal.a, cal.b, cal.dx, cal.dy, cal.dz)
+                NewtonCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        NewtonSectionLabel("Привязка применена к проекту")
+                        Text(
+                            "Поворот ${"%.4f".format(p.rotationDeg)}°, масштаб ${"%.6f".format(p.scale)}, " +
+                                "сдвиг по высоте ${"%.3f".format(p.translationH)} м. Применяется ко всем " +
+                                "сохраняемым точкам автоматически.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        NewtonSecondaryButton(
+                            onClick = { viewModel.clear() },
+                            text = "Сбросить привязку",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+
             result?.let { r ->
                 r.fold(
-                    onSuccess = { ResultCard(it) },
+                    onSuccess = { res ->
+                        ResultCard(res)
+                        NewtonPrimaryButton(
+                            onClick = { viewModel.save(res.params) },
+                            text = "Применить к проекту",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
                     onFailure = {
                         NewtonCard {
                             Text(

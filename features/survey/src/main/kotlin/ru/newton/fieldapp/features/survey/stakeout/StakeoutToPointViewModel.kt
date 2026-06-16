@@ -16,6 +16,7 @@ import ru.newton.fieldapp.crs.CrsPresets
 import ru.newton.fieldapp.crs.CrsTransformer
 import ru.newton.fieldapp.crs.GeoPoint
 import ru.newton.fieldapp.data.preferences.ActiveProjectStore
+import ru.newton.fieldapp.domain.model.CalibrationConfig
 import ru.newton.fieldapp.domain.model.NewPoint
 import ru.newton.fieldapp.domain.model.Point
 import ru.newton.fieldapp.domain.model.PointSource
@@ -49,16 +50,18 @@ class StakeoutToPointViewModel
 
         private val target = MutableStateFlow<Point?>(null)
         private val crsPresetId = MutableStateFlow<String?>(null)
+        private val calibration = MutableStateFlow<CalibrationConfig?>(null)
 
         val state: StateFlow<StakeoutState> = combine(
             store.status,
             target,
             crsPresetId,
             preferences.defaults,
-        ) { status, t, presetId, defaults ->
+            calibration,
+        ) { status, t, presetId, defaults, cal ->
             when {
                 t == null || presetId == null -> StakeoutState.Loading
-                else -> resolveStakeout(status, t, presetId, defaults.toleranceHorizontalM)
+                else -> resolveStakeout(status, t, presetId, defaults.toleranceHorizontalM, cal)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StakeoutState.Loading)
 
@@ -67,6 +70,7 @@ class StakeoutToPointViewModel
                 val activeId = activeProject.activeId.firstOrNull() ?: return@launch
                 val project = projectRepository.observeById(activeId).firstOrNull() ?: return@launch
                 crsPresetId.value = project.crsConfig.presetId
+                calibration.value = project.crsConfig.calibration
                 target.value = pointRepository.observePoints(project.id).firstOrNull()
                     ?.firstOrNull { it.id == targetId }
             }
@@ -79,7 +83,13 @@ class StakeoutToPointViewModel
                 runCatching {
                     val status = store.status.value
                     val crs = CrsPresets.parse(presetId) ?: Crs.Wgs84Geo
-                    val (n, e, h) = currentNeh(status, crs)
+                    val (rawN, rawE, rawH) = currentNeh(status, crs)
+                    // Same local-grid calibration the target was stored with.
+                    val (n, e, h) = if (crs is Crs.Projected) {
+                        calibration.value?.apply(rawN, rawE, rawH) ?: Triple(rawN, rawE, rawH)
+                    } else {
+                        Triple(rawN, rawE, rawH)
+                    }
                     val prefs = preferences.defaults.firstOrNull()
                     val observation = ObservationFactory.fromSamples(
                         listOf(status),
@@ -125,6 +135,7 @@ class StakeoutToPointViewModel
             target: Point,
             presetId: String,
             toleranceM: Double,
+            cal: CalibrationConfig?,
         ): StakeoutState {
             val lat = status.latitude ?: return StakeoutState.WaitingForFix
             val lon = status.longitude ?: return StakeoutState.WaitingForFix
@@ -133,10 +144,14 @@ class StakeoutToPointViewModel
             val vector = when (crs) {
                 is Crs.Projected -> {
                     val p = CrsTransformer.project(GeoPoint(lat, lon, height), Crs.Wgs84Geo, crs)
+                    // Calibrate the live position onto the same local grid the
+                    // target point was stored on, or the guidance is offset.
+                    val (cn, ce, ch) = cal?.apply(p.northingM, p.eastingM, p.heightM)
+                        ?: Triple(p.northingM, p.eastingM, p.heightM)
                     StakeoutVector.between(
-                        currentN = p.northingM,
-                        currentE = p.eastingM,
-                        currentH = p.heightM,
+                        currentN = cn,
+                        currentE = ce,
+                        currentH = ch,
                         targetN = target.n,
                         targetE = target.e,
                         targetH = target.h,

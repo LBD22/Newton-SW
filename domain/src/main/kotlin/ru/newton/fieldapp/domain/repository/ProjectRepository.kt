@@ -35,6 +35,9 @@ interface ProjectRepository {
      */
     suspend fun setCrs(id: Long, presetId: String)
 
+    /** Persist (or clear with null) the project's local site calibration. */
+    suspend fun setCalibration(id: Long, calibration: ru.newton.fieldapp.domain.model.CalibrationConfig?)
+
     suspend fun delete(id: Long)
 
     suspend fun copy(

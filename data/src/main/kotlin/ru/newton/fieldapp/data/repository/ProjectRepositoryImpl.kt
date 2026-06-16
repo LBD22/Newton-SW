@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import ru.newton.fieldapp.data.db.dao.ProjectDao
 import ru.newton.fieldapp.data.db.entity.ProjectEntity
 import ru.newton.fieldapp.data.mapper.toDomain
+import ru.newton.fieldapp.domain.model.CalibrationConfig
 import ru.newton.fieldapp.domain.model.CrsConfig
 import ru.newton.fieldapp.domain.model.GeoidConfig
 import ru.newton.fieldapp.domain.model.HeightMode
@@ -64,6 +65,18 @@ class ProjectRepositoryImpl
             val current = dao.byId(id) ?: return
             val cfg = json.decodeFromString(CrsConfig.serializer(), current.crsConfigJson)
                 .copy(presetId = presetId)
+            dao.update(
+                current.copy(
+                    crsConfigJson = json.encodeToString(CrsConfig.serializer(), cfg),
+                    updatedAtUtc = System.currentTimeMillis(),
+                ),
+            )
+        }
+
+        override suspend fun setCalibration(id: Long, calibration: CalibrationConfig?) {
+            val current = dao.byId(id) ?: return
+            val cfg = json.decodeFromString(CrsConfig.serializer(), current.crsConfigJson)
+                .copy(calibration = calibration)
             dao.update(
                 current.copy(
                     crsConfigJson = json.encodeToString(CrsConfig.serializer(), cfg),
