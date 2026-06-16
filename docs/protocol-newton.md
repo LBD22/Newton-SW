@@ -76,8 +76,8 @@ Only after this is `CommandSession` in `Ready` state and commands may be sent.
 | `mode set base <B> <L> <H>` | Base at fixed coords |
 | `mode rtcmid <value>` | RTCM ID for base |
 | `mode cmrid <value>` | CMR ID |
-| `mode set ppp <TYPE> <on\|off>` | PPP mode |
-| `mode set ppp sbas <on\|off> <SBAS>` | SBAS sub-mode |
+| `ppp <TYPE> <on\|off>` | PPP mode (no `mode set` prefix — see OSdoc_command_port) |
+| `ppp sbas <on\|off> <SBAS>` | SBAS sub-mode |
 
 ### survey
 
