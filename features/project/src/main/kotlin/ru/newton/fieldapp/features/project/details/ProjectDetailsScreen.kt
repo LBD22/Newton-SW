@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import ru.newton.fieldapp.core.ui.components.TileAccent
 import ru.newton.fieldapp.core.ui.components.TileData
 import ru.newton.fieldapp.crs.CrsPresets
 import ru.newton.fieldapp.crs.displayLabel
+import ru.newton.fieldapp.domain.model.HeightMode
 import ru.newton.fieldapp.domain.model.PointSource
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -75,6 +77,7 @@ fun ProjectDetailsScreen(
         onChangeCrs = onChangeCrs,
         onOpenPoints = onOpenPoints,
         onOpenLayers = onOpenLayers,
+        onSetHeightMode = viewModel::setHeightMode,
     )
 }
 
@@ -86,6 +89,7 @@ private fun ProjectDetailsContent(
     onChangeCrs: () -> Unit,
     onOpenPoints: () -> Unit,
     onOpenLayers: () -> Unit,
+    onSetHeightMode: (HeightMode) -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -125,6 +129,7 @@ private fun ProjectDetailsContent(
                     onChangeCrs = onChangeCrs,
                     onOpenPoints = onOpenPoints,
                     onOpenLayers = onOpenLayers,
+                    onSetHeightMode = onSetHeightMode,
                 )
             }
         }
@@ -137,6 +142,7 @@ private fun ContentBody(
     onChangeCrs: () -> Unit,
     onOpenPoints: () -> Unit,
     onOpenLayers: () -> Unit,
+    onSetHeightMode: (HeightMode) -> Unit,
 ) {
     val crsLabel = CrsPresets.parse(state.project.crsConfig.presetId)?.displayLabel()
         ?: state.project.crsConfig.presetId
@@ -218,6 +224,43 @@ private fun ContentBody(
             leadingIcon = Icons.Default.GpsFixed,
             onClick = onChangeCrs,
         )
+
+        HeightModeCard(
+            current = state.project.crsConfig.heightMode,
+            onSetHeightMode = onSetHeightMode,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HeightModeCard(
+    current: HeightMode,
+    onSetHeightMode: (HeightMode) -> Unit,
+) {
+    NewtonCard {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel("Высоты")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = current == HeightMode.ELLIPSOIDAL,
+                    onClick = { onSetHeightMode(HeightMode.ELLIPSOIDAL) },
+                    label = { Text("Эллипсоидальные") },
+                )
+                FilterChip(
+                    selected = current == HeightMode.ORTHOMETRIC,
+                    onClick = { onSetHeightMode(HeightMode.ORTHOMETRIC) },
+                    label = { Text("Ортометрические") },
+                )
+            }
+            Text(
+                "Ортометрические высоты считаются как H − N, где N (превышение " +
+                    "геоида) берётся из GGA приёмника. Применяется к точкам, " +
+                    "снятым ПОСЛЕ смены режима; ранее снятые не пересчитываются.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

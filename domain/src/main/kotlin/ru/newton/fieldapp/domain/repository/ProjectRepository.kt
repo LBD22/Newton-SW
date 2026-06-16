@@ -38,6 +38,9 @@ interface ProjectRepository {
     /** Persist (or clear with null) the project's local site calibration. */
     suspend fun setCalibration(id: Long, calibration: ru.newton.fieldapp.domain.model.CalibrationConfig?)
 
+    /** Set the project's stored-height system (ellipsoidal vs orthometric). Future saves only. */
+    suspend fun setHeightMode(id: Long, mode: ru.newton.fieldapp.domain.model.HeightMode)
+
     suspend fun delete(id: Long)
 
     suspend fun copy(

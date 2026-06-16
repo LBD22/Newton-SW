@@ -85,6 +85,18 @@ class ProjectRepositoryImpl
             )
         }
 
+        override suspend fun setHeightMode(id: Long, mode: HeightMode) {
+            val current = dao.byId(id) ?: return
+            val cfg = json.decodeFromString(CrsConfig.serializer(), current.crsConfigJson)
+                .copy(heightMode = mode)
+            dao.update(
+                current.copy(
+                    crsConfigJson = json.encodeToString(CrsConfig.serializer(), cfg),
+                    updatedAtUtc = System.currentTimeMillis(),
+                ),
+            )
+        }
+
         override suspend fun delete(id: Long) = dao.deleteById(id)
 
         override suspend fun copy(

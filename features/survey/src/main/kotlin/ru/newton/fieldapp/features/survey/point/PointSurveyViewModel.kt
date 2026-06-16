@@ -25,7 +25,7 @@ import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
-import ru.newton.fieldapp.features.survey.defaults.applyCalibration
+import ru.newton.fieldapp.features.survey.defaults.toStoredCoords
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -176,8 +176,14 @@ class PointSurveyViewModel
                         }
                         is Crs.Geographic -> Triple(geo.latDeg, geo.lonDeg, geo.ellipsoidalHeightM)
                     }
-                    // Pull onto the customer's local grid if the project is calibrated.
-                    val (n, e, h) = project.crsConfig.applyCalibration(targetCrs, rawN, rawE, rawH)
+                    // Apply height mode (orthometric via receiver N) + local calibration.
+                    val (n, e, h) = project.crsConfig.toStoredCoords(
+                        targetCrs,
+                        rawN,
+                        rawE,
+                        rawH,
+                        ready.averageGeoidSep,
+                    )
                     pointRepository.save(
                         NewPoint(
                             projectId = project.id,
@@ -219,9 +225,11 @@ class PointSurveyViewModel
             val lats = mapNotNull { it.latitude }
             val lons = mapNotNull { it.longitude }
             val hs = mapNotNull { it.ellipsoidalHeight }
+            val seps = mapNotNull { it.geoidSeparation }
             val meanLat = lats.average()
             val meanLon = lons.average()
             val meanH = if (hs.isNotEmpty()) hs.average() else 0.0
+            val meanSep = if (seps.isNotEmpty()) seps.average() else null
             val sigmaH = if (hs.size > 1) {
                 val variance = hs.sumOf { (it - meanH) * (it - meanH) } / (hs.size - 1)
                 sqrt(variance)
@@ -232,6 +240,7 @@ class PointSurveyViewModel
                 averageLat = meanLat,
                 averageLon = meanLon,
                 averageH = meanH,
+                averageGeoidSep = meanSep,
                 sigmaH = sigmaH,
                 sampleCount = size,
                 name = autoName,

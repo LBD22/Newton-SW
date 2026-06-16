@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.newton.fieldapp.core.common.csv.CsvFormat
 import ru.newton.fieldapp.core.logging.AppLog
+import ru.newton.fieldapp.domain.model.HeightMode
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.domain.usecase.ExportPointsToCsvUseCase
@@ -26,7 +27,7 @@ class ProjectDetailsViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
-        projectRepository: ProjectRepository,
+        private val projectRepository: ProjectRepository,
         pointRepository: PointRepository,
         private val importUseCase: ImportPointsFromCsvUseCase,
         private val exportUseCase: ExportPointsToCsvUseCase,
@@ -99,6 +100,11 @@ class ProjectDetailsViewModel
         }
 
         suspend fun prepareExport(): String = exportUseCase(projectId, CsvFormat.DEFAULT)
+
+        /** Set the project's stored-height system. Applies to future saves only. */
+        fun setHeightMode(mode: HeightMode) {
+            viewModelScope.launch { projectRepository.setHeightMode(projectId, mode) }
+        }
     }
 
 sealed interface ProjectDetailsEvent {

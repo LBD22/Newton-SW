@@ -26,6 +26,8 @@ sealed interface PointSurveyState {
         val averageLat: Double,
         val averageLon: Double,
         val averageH: Double,
+        /** Averaged geoid separation N (GGA field 11), for orthometric height. Null if absent. */
+        val averageGeoidSep: Double?,
         val sigmaH: Double,
         val sampleCount: Int,
         val name: String = "",

@@ -16,7 +16,7 @@ import ru.newton.fieldapp.crs.CrsPresets
 import ru.newton.fieldapp.crs.CrsTransformer
 import ru.newton.fieldapp.crs.GeoPoint
 import ru.newton.fieldapp.data.preferences.ActiveProjectStore
-import ru.newton.fieldapp.domain.model.CalibrationConfig
+import ru.newton.fieldapp.domain.model.CrsConfig
 import ru.newton.fieldapp.domain.model.NewPoint
 import ru.newton.fieldapp.domain.model.Point
 import ru.newton.fieldapp.domain.model.PointSource
@@ -26,6 +26,7 @@ import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.domain.repository.StakeoutResultRepository
 import ru.newton.fieldapp.features.survey.defaults.ObservationFactory
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
+import ru.newton.fieldapp.features.survey.defaults.toStoredCoords
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
 import javax.inject.Inject
@@ -50,18 +51,18 @@ class StakeoutToPointViewModel
 
         private val target = MutableStateFlow<Point?>(null)
         private val crsPresetId = MutableStateFlow<String?>(null)
-        private val calibration = MutableStateFlow<CalibrationConfig?>(null)
+        private val crsConfig = MutableStateFlow<CrsConfig?>(null)
 
         val state: StateFlow<StakeoutState> = combine(
             store.status,
             target,
             crsPresetId,
             preferences.defaults,
-            calibration,
-        ) { status, t, presetId, defaults, cal ->
+            crsConfig,
+        ) { status, t, presetId, defaults, cfg ->
             when {
                 t == null || presetId == null -> StakeoutState.Loading
-                else -> resolveStakeout(status, t, presetId, defaults.toleranceHorizontalM, cal)
+                else -> resolveStakeout(status, t, presetId, defaults.toleranceHorizontalM, cfg)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StakeoutState.Loading)
 
@@ -70,7 +71,7 @@ class StakeoutToPointViewModel
                 val activeId = activeProject.activeId.firstOrNull() ?: return@launch
                 val project = projectRepository.observeById(activeId).firstOrNull() ?: return@launch
                 crsPresetId.value = project.crsConfig.presetId
-                calibration.value = project.crsConfig.calibration
+                crsConfig.value = project.crsConfig
                 target.value = pointRepository.observePoints(project.id).firstOrNull()
                     ?.firstOrNull { it.id == targetId }
             }
@@ -84,12 +85,10 @@ class StakeoutToPointViewModel
                     val status = store.status.value
                     val crs = CrsPresets.parse(presetId) ?: Crs.Wgs84Geo
                     val (rawN, rawE, rawH) = currentNeh(status, crs)
-                    // Same local-grid calibration the target was stored with.
-                    val (n, e, h) = if (crs is Crs.Projected) {
-                        calibration.value?.apply(rawN, rawE, rawH) ?: Triple(rawN, rawE, rawH)
-                    } else {
-                        Triple(rawN, rawE, rawH)
-                    }
+                    // Store with the same height mode + local grid the target uses.
+                    val (n, e, h) = crsConfig.value
+                        ?.toStoredCoords(crs, rawN, rawE, rawH, status.geoidSeparation)
+                        ?: Triple(rawN, rawE, rawH)
                     val prefs = preferences.defaults.firstOrNull()
                     val observation = ObservationFactory.fromSamples(
                         listOf(status),
@@ -135,7 +134,7 @@ class StakeoutToPointViewModel
             target: Point,
             presetId: String,
             toleranceM: Double,
-            cal: CalibrationConfig?,
+            cfg: CrsConfig?,
         ): StakeoutState {
             val lat = status.latitude ?: return StakeoutState.WaitingForFix
             val lon = status.longitude ?: return StakeoutState.WaitingForFix
@@ -144,9 +143,10 @@ class StakeoutToPointViewModel
             val vector = when (crs) {
                 is Crs.Projected -> {
                     val p = CrsTransformer.project(GeoPoint(lat, lon, height), Crs.Wgs84Geo, crs)
-                    // Calibrate the live position onto the same local grid the
-                    // target point was stored on, or the guidance is offset.
-                    val (cn, ce, ch) = cal?.apply(p.northingM, p.eastingM, p.heightM)
+                    // Put the live position into the same height mode + local grid
+                    // the target was stored on, or the guidance is offset.
+                    val (cn, ce, ch) = cfg
+                        ?.toStoredCoords(crs, p.northingM, p.eastingM, p.heightM, status.geoidSeparation)
                         ?: Triple(p.northingM, p.eastingM, p.heightM)
                     StakeoutVector.between(
                         currentN = cn,

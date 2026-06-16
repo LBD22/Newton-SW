@@ -37,6 +37,8 @@ data class Vertex(
     val e: Double,
     val h: Double,
     val sigmaH: Double,
+    /** Averaged geoid separation N (GGA field 11) for orthometric height. Null if absent. */
+    val geoidSep: Double? = null,
     /** Quality metadata for this vertex's epochs, persisted with the saved point. */
     val observation: ru.newton.fieldapp.domain.model.NewObservation? = null,
 )
