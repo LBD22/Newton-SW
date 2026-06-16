@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.CallMerge
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.FiberManualRecord
@@ -46,6 +47,7 @@ import ru.newton.fieldapp.core.ui.components.NewtonTile
 import ru.newton.fieldapp.core.ui.components.PendingBanner
 import ru.newton.fieldapp.features.settings.about.AboutScreen
 import ru.newton.fieldapp.features.settings.apply.ApplyScreen
+import ru.newton.fieldapp.features.settings.base.BaseStationScreen
 import ru.newton.fieldapp.features.settings.bluetooth.BluetoothConnectScreen
 import ru.newton.fieldapp.features.settings.bridge.BridgeScreen
 import ru.newton.fieldapp.features.settings.btio.BluetoothIoScreen
@@ -68,6 +70,7 @@ const val SETTINGS_TAB_ROUTE = "settings"
 private const val INDEX_ROUTE = "settings/index"
 private const val BLUETOOTH_ROUTE = "settings/bluetooth"
 private const val ROVER_ROUTE = "settings/rover"
+private const val BASE_ROUTE = "settings/base"
 private const val APPLY_ROUTE = "settings/apply"
 private const val CORRECTION_ROUTE = "settings/correction"
 private const val NTRIP_LIST_ROUTE = "settings/ntrip/list"
@@ -99,6 +102,7 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
                 onNavigateToApply = { navController.navigate(APPLY_ROUTE) },
             )
         }
+        composable(BASE_ROUTE) { BaseStationScreen(onBack = { navController.popBackStack() }) }
         composable(APPLY_ROUTE) { ApplyScreen(onBack = { navController.popBackStack() }) }
         composable(CORRECTION_ROUTE) {
             CorrectionSourceScreen(
@@ -191,6 +195,7 @@ private fun SettingsIndexScreen(
                 label = "Приёмник",
                 tiles = listOf(
                     SettingsTile("Ровер", Icons.Default.GpsFixed) { navController.navigate(ROVER_ROUTE) },
+                    SettingsTile("База", Icons.Default.CellTower) { navController.navigate(BASE_ROUTE) },
                     SettingsTile("Сообщения", Icons.Default.SettingsInputAntenna) { navController.navigate(OUTPUT_ROUTE) },
                     SettingsTile("PPP / SBAS", Icons.Default.PrivacyTip) { navController.navigate(PPP_ROUTE) },
                     SettingsTile("Применение", Icons.Default.CheckCircle) { navController.navigate(APPLY_ROUTE) },
