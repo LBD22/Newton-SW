@@ -23,6 +23,7 @@ import ru.newton.fieldapp.domain.model.TrackPointSample
 import ru.newton.fieldapp.domain.model.TrackSession
 import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.domain.repository.TrackRepository
+import ru.newton.fieldapp.domain.usecase.ExportTrackCsvUseCase
 import ru.newton.fieldapp.features.survey.defaults.SurveyPreferences
 import ru.newton.fieldapp.features.survey.defaults.TiltCorrector
 import ru.newton.fieldapp.gnss.data.FixQuality
@@ -48,7 +49,9 @@ class TrackRecordingViewModel
         private val projectRepository: ProjectRepository,
         private val trackRepository: TrackRepository,
         private val activeProject: ActiveProjectStore,
+        private val exportTrackUseCase: ExportTrackCsvUseCase,
     ) : ViewModel() {
+        suspend fun prepareTrackExport(sessionId: Long): String = exportTrackUseCase(sessionId)
         private val activeSessionId = MutableStateFlow<Long?>(null)
         private var samplerJob: Job? = null
         private var lastSampleAtMs: Long = 0L

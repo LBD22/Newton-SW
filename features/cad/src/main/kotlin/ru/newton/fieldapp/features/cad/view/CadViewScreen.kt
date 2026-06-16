@@ -1,5 +1,9 @@
 package ru.newton.fieldapp.features.cad.view
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -10,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -30,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -40,9 +47,12 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import ru.newton.fieldapp.crs.Crs
 import ru.newton.fieldapp.crs.CrsPresets
 import ru.newton.fieldapp.crs.CrsTransformer
@@ -53,6 +63,9 @@ import ru.newton.fieldapp.data.overlay.MapOverlayHolder
 import ru.newton.fieldapp.data.preferences.ActiveProjectStore
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
+import ru.newton.fieldapp.features.cad.dxf.DxfDrawing
+import ru.newton.fieldapp.features.cad.dxf.DxfEntity
+import ru.newton.fieldapp.features.cad.dxf.DxfWriter
 import javax.inject.Inject
 
 data class CadPoint(val name: String, val lat: Double, val lon: Double)
@@ -69,10 +82,29 @@ class CadViewViewModel
     @Inject
     constructor(
         overlayHolder: MapOverlayHolder,
-        activeProject: ActiveProjectStore,
+        private val activeProject: ActiveProjectStore,
         projectRepository: ProjectRepository,
-        pointRepository: PointRepository,
+        private val pointRepository: PointRepository,
     ) : ViewModel() {
+        /**
+         * Export the active project's points to DXF in PROJECT grid coordinates
+         * (x = E, y = N, z = H) — one POINT plus a TEXT label per point, layered
+         * by code. The DxfWriter already produces NanoCAD/AutoCAD-clean output.
+         */
+        suspend fun prepareDxfExport(): String {
+            val id = activeProject.activeId.firstOrNull()
+                ?: return DxfWriter.write(DxfDrawing(emptyList()))
+            val points = pointRepository.observePoints(id).first()
+            val entities = points.flatMap { p ->
+                val layer = p.code?.takeIf { it.isNotBlank() } ?: "POINTS"
+                listOf(
+                    DxfEntity.Point(layer = layer, x = p.e, y = p.n, z = p.h),
+                    DxfEntity.Text(layer = layer, x = p.e, y = p.n, z = p.h, heightM = 0.2, value = p.name),
+                )
+            }
+            return DxfWriter.write(DxfDrawing(entities))
+        }
+
         private val projectPointsFlow = activeProject.activeId.flatMapLatest { id ->
             if (id == null) {
                 flowOf(emptyList())
@@ -117,7 +149,28 @@ fun CadViewScreen(
     viewModel: CadViewViewModel = hiltViewModel(),
 ) {
     val scene by viewModel.scene.collectAsStateWithLifecycle()
-    CadViewContent(scene = scene, onBack = onBack, onImportDxf = onImportDxf)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/dxf"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val payload = viewModel.prepareDxfExport()
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(payload) }
+                Toast.makeText(context, "Точки сохранены в DXF", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Не удалось сохранить: ${it.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    CadViewContent(
+        scene = scene,
+        onBack = onBack,
+        onImportDxf = onImportDxf,
+        onExportDxf = { exportLauncher.launch("points.dxf") },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,6 +179,7 @@ private fun CadViewContent(
     scene: CadScene,
     onBack: () -> Unit,
     onImportDxf: () -> Unit,
+    onExportDxf: () -> Unit,
 ) {
     var pan by remember { mutableStateOf(Offset.Zero) }
     var zoom by remember { mutableFloatStateOf(1f) }
@@ -146,6 +200,9 @@ private fun CadViewContent(
                     }
                     IconButton(onClick = onImportDxf) {
                         Icon(Icons.Default.FileDownload, contentDescription = "Импорт DXF")
+                    }
+                    IconButton(onClick = onExportDxf) {
+                        Icon(Icons.Default.FileUpload, contentDescription = "Экспорт точек в DXF")
                     }
                 },
             )

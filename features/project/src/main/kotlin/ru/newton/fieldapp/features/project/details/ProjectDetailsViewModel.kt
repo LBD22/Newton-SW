@@ -19,6 +19,7 @@ import ru.newton.fieldapp.domain.model.HeightMode
 import ru.newton.fieldapp.domain.repository.PointRepository
 import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.domain.usecase.ExportPointsToCsvUseCase
+import ru.newton.fieldapp.domain.usecase.ExportResurveyDeltaCsvUseCase
 import ru.newton.fieldapp.domain.usecase.ImportPointsFromCsvUseCase
 import javax.inject.Inject
 
@@ -31,6 +32,7 @@ class ProjectDetailsViewModel
         pointRepository: PointRepository,
         private val importUseCase: ImportPointsFromCsvUseCase,
         private val exportUseCase: ExportPointsToCsvUseCase,
+        private val resurveyExportUseCase: ExportResurveyDeltaCsvUseCase,
         private val log: AppLog,
     ) : ViewModel() {
         private val projectId: Long = checkNotNull(savedStateHandle["projectId"]) {
@@ -100,6 +102,8 @@ class ProjectDetailsViewModel
         }
 
         suspend fun prepareExport(): String = exportUseCase(projectId, CsvFormat.DEFAULT)
+
+        suspend fun prepareResurveyExport(): String = resurveyExportUseCase(projectId)
 
         /** Set the project's stored-height system. Applies to future saves only. */
         fun setHeightMode(mode: HeightMode) {

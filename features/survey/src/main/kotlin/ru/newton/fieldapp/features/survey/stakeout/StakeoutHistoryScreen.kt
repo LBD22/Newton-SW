@@ -1,5 +1,9 @@
 package ru.newton.fieldapp.features.survey.stakeout
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,8 +26,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -32,6 +39,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -64,10 +72,15 @@ class StakeoutHistoryViewModel
     @OptIn(ExperimentalCoroutinesApi::class)
     @Inject
     constructor(
-        activeProject: ActiveProjectStore,
+        private val activeProject: ActiveProjectStore,
         preferences: ru.newton.fieldapp.features.survey.defaults.SurveyPreferences,
         private val repository: StakeoutResultRepository,
+        private val exportUseCase: ru.newton.fieldapp.domain.usecase.ExportStakeoutHistoryCsvUseCase,
     ) : ViewModel() {
+        suspend fun prepareExport(): String {
+            val id = activeProject.activeId.firstOrNull() ?: return ""
+            return exportUseCase(id)
+        }
         val state: StateFlow<StakeoutHistoryState> = kotlinx.coroutines.flow.combine(
             activeProject.activeId.flatMapLatest { id ->
                 if (id == null) flowOf(emptyList()) else repository.observeByProject(id)
@@ -99,7 +112,28 @@ fun StakeoutHistoryScreen(
     viewModel: StakeoutHistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    StakeoutHistoryContent(state = state, onBack = onBack, onDelete = viewModel::delete)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val payload = viewModel.prepareExport()
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(payload) }
+                Toast.makeText(context, "История выноса сохранена", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Не удалось сохранить: ${it.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    StakeoutHistoryContent(
+        state = state,
+        onBack = onBack,
+        onDelete = viewModel::delete,
+        onExport = { exportLauncher.launch("stakeout_history.csv") },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,6 +142,7 @@ private fun StakeoutHistoryContent(
     state: StakeoutHistoryState,
     onBack: () -> Unit,
     onDelete: (Long) -> Unit,
+    onExport: () -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -117,6 +152,13 @@ private fun StakeoutHistoryContent(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    }
+                },
+                actions = {
+                    if (state.rows.isNotEmpty()) {
+                        IconButton(onClick = onExport) {
+                            Icon(Icons.Default.Download, contentDescription = "Экспорт CSV")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

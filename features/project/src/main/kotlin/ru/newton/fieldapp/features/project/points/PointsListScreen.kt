@@ -122,6 +122,21 @@ fun PointsListScreen(
         }
     }
 
+    val resurveyExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val payload = viewModel.prepareResurveyExport()
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(payload) }
+                snackbarHostState.showSnackbar("Ведомость пересъёмки сохранена")
+            }.onFailure {
+                snackbarHostState.showSnackbar("Не удалось сохранить файл: ${it.message}")
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -144,6 +159,10 @@ fun PointsListScreen(
             val name = (state as? ProjectDetailsState.Content)?.project?.name ?: "project"
             exportLauncher.launch("$name.csv")
         },
+        onExportResurvey = {
+            val name = (state as? ProjectDetailsState.Content)?.project?.name ?: "project"
+            resurveyExportLauncher.launch("${name}_resurvey.csv")
+        },
     )
 }
 
@@ -157,6 +176,7 @@ private fun PointsListContent(
     onOpenPoint: (Long) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
+    onExportResurvey: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var menuOpen by remember { mutableStateOf(false) }
@@ -208,6 +228,10 @@ private fun PointsListContent(
                             DropdownMenuItem(
                                 text = { Text("Экспорт CSV…") },
                                 onClick = { menuOpen = false; onExport() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Ведомость пересъёмки…") },
+                                onClick = { menuOpen = false; onExportResurvey() },
                             )
                         }
                     }
