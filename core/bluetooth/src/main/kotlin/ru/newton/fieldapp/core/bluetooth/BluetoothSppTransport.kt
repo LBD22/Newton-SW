@@ -142,7 +142,6 @@ class BluetoothSppTransport(
             socket = opened
             _linkState.value = LinkState.Connected(
                 deviceName = opened.remoteDevice?.name ?: deviceAddress,
-                rssi = null,
             )
             log.bt("connected to $deviceAddress")
             val connectedAtMs = SystemClock.elapsedRealtime()

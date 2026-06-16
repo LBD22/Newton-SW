@@ -17,8 +17,6 @@ sealed interface LinkState {
     /** Socket is open and reading. */
     data class Connected(
         val deviceName: String,
-        /** RSSI in dBm if available on this platform, else null. */
-        val rssi: Int? = null,
     ) : LinkState
 
     /**

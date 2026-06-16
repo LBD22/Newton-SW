@@ -25,7 +25,6 @@
 
     <!-- Optional: photo attachment for points; requested contextually -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <!-- Stakeout-in-tolerance haptic feedback. No runtime prompt required. -->
     <uses-permission android:name="android.permission.VIBRATE" />

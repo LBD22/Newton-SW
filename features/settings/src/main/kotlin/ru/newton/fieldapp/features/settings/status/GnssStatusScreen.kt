@@ -25,12 +25,26 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.core.ui.components.NewtonInfoBadge
 import ru.newton.fieldapp.core.ui.components.NewtonSectionLabel
 import ru.newton.fieldapp.core.ui.theme.LocalFixStatusColors
+import ru.newton.fieldapp.crs.Crs
+import ru.newton.fieldapp.crs.CrsPresets
+import ru.newton.fieldapp.crs.CrsTransformer
+import ru.newton.fieldapp.crs.GeoPoint
+import ru.newton.fieldapp.data.preferences.ActiveProjectStore
+import ru.newton.fieldapp.domain.model.HeightMode
+import ru.newton.fieldapp.domain.repository.ProjectRepository
 import ru.newton.fieldapp.gnss.data.FixQuality
 import ru.newton.fieldapp.gnss.data.GnssStatus
 import ru.newton.fieldapp.gnss.data.GnssStatusStore
@@ -50,9 +64,43 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class GnssStatusViewModel
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Inject
-    constructor(store: GnssStatusStore) : ViewModel() {
-        val status: StateFlow<GnssStatus> = store.status
+    constructor(
+        store: GnssStatusStore,
+        projectRepository: ProjectRepository,
+        activeProject: ActiveProjectStore,
+    ) : ViewModel() {
+        private val projectFlow = activeProject.activeId.flatMapLatest { id ->
+            if (id == null) flowOf(null) else projectRepository.observeById(id)
+        }
+
+        /**
+         * Live status with projected N/E/H filled from the active project's CRS
+         * (+ height mode and local calibration, matching how points are stored).
+         * Only populated for a projected CRS — N/E in metres is meaningless for a
+         * geographic project, so those rows stay hidden there.
+         */
+        val status: StateFlow<GnssStatus> = combine(store.status, projectFlow) { s, project ->
+            val lat = s.latitude
+            val lon = s.longitude
+            val cfg = project?.crsConfig
+            val crs = cfg?.presetId?.let(CrsPresets::parse) as? Crs.Projected
+            if (lat == null || lon == null || cfg == null || crs == null) {
+                s
+            } else {
+                val ellipsoidal = s.ellipsoidalHeight ?: 0.0
+                val p = CrsTransformer.project(GeoPoint(lat, lon, ellipsoidal), Crs.Wgs84Geo, crs)
+                val orthoH = if (cfg.heightMode == HeightMode.ORTHOMETRIC && s.geoidSeparation != null) {
+                    p.heightM - s.geoidSeparation!!
+                } else {
+                    p.heightM
+                }
+                val (n, e, h) = cfg.calibration?.apply(p.northingM, p.eastingM, orthoH)
+                    ?: Triple(p.northingM, p.eastingM, orthoH)
+                s.copy(n = n, e = e, h = h)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GnssStatus.initial())
     }
 
 @Composable

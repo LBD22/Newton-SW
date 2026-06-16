@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":core:logging"))
     implementation(project(":domain"))
     implementation(project(":data"))
+    implementation(project(":crs"))
     implementation(project(":core:bluetooth"))
     implementation(project(":gnss:data"))
     implementation(project(":gnss:command"))

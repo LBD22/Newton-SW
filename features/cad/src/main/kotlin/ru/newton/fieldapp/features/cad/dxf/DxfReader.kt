@@ -20,6 +20,10 @@ package ru.newton.fieldapp.features.cad.dxf
 object DxfReader {
     fun parse(content: String): DxfDrawing {
         val tokens = tokenize(content)
+        // $INSUNITS in the HEADER tells us the drawing's units; scale everything
+        // to metres on the way in. Without this a drawing authored in mm/feet
+        // imported 1000×/3× off, silently.
+        val scale = insUnitsScale(tokens)
         val entities = mutableListOf<DxfEntity>()
         var i = 0
         // Walk forward to ENTITIES section.
@@ -37,7 +41,44 @@ object DxfReader {
             }
             i++
         }
-        return DxfDrawing(entities)
+        return DxfDrawing(entities.map { it.scaledToMetres(scale) })
+    }
+
+    /** Read `$INSUNITS` (HEADER var: code 9 `$INSUNITS`, then code 70 int) → metres-per-unit. */
+    private fun insUnitsScale(tokens: List<DxfToken>): Double {
+        var i = 0
+        while (i < tokens.size - 1) {
+            if (tokens[i].code == 9 && tokens[i].value == "\$INSUNITS") {
+                val next = tokens[i + 1]
+                if (next.code == 70) return unitCodeToMetres(next.value.trim().toIntOrNull() ?: 0)
+            }
+            i++
+        }
+        return 1.0
+    }
+
+    /** DXF $INSUNITS code → metres. 0/unknown is treated as metres (best effort). */
+    private fun unitCodeToMetres(code: Int): Double = when (code) {
+        1 -> 0.0254 // inches
+        2 -> 0.3048 // feet
+        4 -> 0.001 // millimetres
+        5 -> 0.01 // centimetres
+        6 -> 1.0 // metres
+        else -> 1.0
+    }
+
+    private fun DxfEntity.scaledToMetres(s: Double): DxfEntity = if (s == 1.0) {
+        this
+    } else {
+        when (this) {
+            is DxfEntity.Point -> copy(x = x * s, y = y * s, z = z * s)
+            is DxfEntity.Line -> copy(x1 = x1 * s, y1 = y1 * s, z1 = z1 * s, x2 = x2 * s, y2 = y2 * s, z2 = z2 * s)
+            is DxfEntity.Polyline -> copy(vertices = vertices.map { Vertex(it.x * s, it.y * s, it.z * s) })
+            is DxfEntity.Circle -> copy(cx = cx * s, cy = cy * s, cz = cz * s, radius = radius * s)
+            // Angles are scale-invariant; only the centre + radius scale.
+            is DxfEntity.Arc -> copy(cx = cx * s, cy = cy * s, cz = cz * s, radius = radius * s)
+            is DxfEntity.Text -> copy(x = x * s, y = y * s, z = z * s, heightM = heightM * s)
+        }
     }
 
     private fun parseEntitiesSection(tokens: List<DxfToken>, start: Int): Pair<List<DxfEntity>, Int> {

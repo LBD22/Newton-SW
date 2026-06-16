@@ -91,7 +91,6 @@ dependencies {
     implementation(project(":features:settings"))
     implementation(project(":features:survey"))
     implementation(project(":features:cad"))
-    implementation(project(":features:export"))
 
     // Core
     implementation(project(":core:common"))

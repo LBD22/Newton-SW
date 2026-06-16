@@ -144,7 +144,15 @@ private fun PermissionsStep(onNext: () -> Unit) {
                 add(Manifest.permission.BLUETOOTH_CONNECT)
                 add(Manifest.permission.BLUETOOTH_SCAN)
             }
+            // FINE alone is ignored on API 31+ unless COARSE is requested in the
+            // same call — ask for both.
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
             add(Manifest.permission.ACCESS_FINE_LOCATION)
+            // The GNSS foreground-service notification (link status + stop) is
+            // suppressed on Android 13+ without this runtime grant.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }.toTypedArray()
     }
     val launcher = rememberLauncherForActivityResult(
