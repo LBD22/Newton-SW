@@ -94,4 +94,22 @@ class PatchToCommandsTest {
         assertTrue("secret" in cmd)
         assertTrue(cmd.endsWith("gppga")) { cmd }
     }
+
+    @Test
+    fun `gsm ntrip input emits input set gsmntripclient for receiver-modem NTRIP`() {
+        val patch = ReceiverConfigPatch(
+            input = InputConfig.GsmNtripClient(
+                host = "95.163.249.164",
+                port = 2103,
+                endpoint = "NEAREST_RTCM32",
+                login = "user1",
+                password = "secret",
+            ),
+        )
+        val cmd = PatchToCommands.build(patch).first().command
+        assertTrue(cmd.startsWith("input set gsmntripclient ")) { cmd }
+        assertTrue("95.163.249.164" in cmd)
+        assertTrue("NEAREST_RTCM32" in cmd)
+        assertTrue(cmd.endsWith("gppga")) { cmd }
+    }
 }

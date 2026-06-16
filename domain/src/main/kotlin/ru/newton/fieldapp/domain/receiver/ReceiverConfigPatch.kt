@@ -115,6 +115,20 @@ sealed interface InputConfig {
         val password: String,
     ) : InputConfig
 
+    /**
+     * NTRIP pulled by the receiver's OWN GSM modem (`input set gsmntripclient`)
+     * — no controller internet, no Bluetooth RTCM forwarding. Requires the GSM
+     * modem to be enabled with an APN (`gsm set on <apn>`, see [ReceiverConfigPatch.gsm]).
+     */
+    @Serializable
+    data class GsmNtripClient(
+        val host: String,
+        val port: Int,
+        val endpoint: String,
+        val login: String,
+        val password: String,
+    ) : InputConfig
+
     @Serializable
     data class Com(
         val index: Int,

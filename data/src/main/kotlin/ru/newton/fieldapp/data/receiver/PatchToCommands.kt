@@ -80,6 +80,9 @@ object PatchToCommands {
         patch.surveyMaskDeg?.let { deg ->
             add(PreparedCommand(NewtonCommandBuilder.surveySetMask(deg), "Маска возвышения $deg°"))
         }
+        // GSM modem (APN) before the input source — `input set gsmntripclient`
+        // uses the modem, so configure the transport first.
+        patch.gsm?.let { add(toGsmCommand(it)) }
         patch.input?.let { input -> add(toInputCommand(input)) }
         patch.bluetoothReceiver?.let { on ->
             add(PreparedCommand(NewtonCommandBuilder.bluetoothSet(on), if (on) "BT приёмника: вкл" else "BT приёмника: выкл"))
@@ -101,7 +104,6 @@ object PatchToCommands {
             )
         }
         patch.ppp?.let { add(toPppCommand(it)) }
-        patch.gsm?.let { add(toGsmCommand(it)) }
         patch.bluetoothBridge?.let { add(toBluetoothBridgeCommand(it)) }
         patch.outputMessages?.let { msgs ->
             add(PreparedCommand(NewtonCommandBuilder.outputClearMessage(), "Очистить сообщения"))
@@ -137,6 +139,16 @@ object PatchToCommands {
                 config.password,
             ),
             "Источник: NTRIP ${config.host}/${config.endpoint}",
+        )
+        is InputConfig.GsmNtripClient -> PreparedCommand(
+            NewtonCommandBuilder.inputSetGsmNtripClient(
+                config.host,
+                config.port,
+                config.endpoint,
+                config.login,
+                config.password,
+            ),
+            "Источник: NTRIP через GSM ${config.host}/${config.endpoint}",
         )
         is InputConfig.Com -> {
             val port = comPortOrFail(config.index)

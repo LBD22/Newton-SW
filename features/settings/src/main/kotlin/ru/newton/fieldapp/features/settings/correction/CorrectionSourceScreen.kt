@@ -3,6 +3,7 @@ package ru.newton.fieldapp.features.settings.correction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,7 @@ fun CorrectionSourceScreen(
         onBack = onBack,
         onManageProfiles = onManageProfiles,
         onSelectProfile = viewModel::onSelectProfile,
+        onSelectProfileViaGsm = viewModel::onSelectProfileViaGsm,
         onDisable = viewModel::onDisable,
     )
 }
@@ -52,6 +54,7 @@ private fun CorrectionSourceContent(
     onBack: () -> Unit,
     onManageProfiles: () -> Unit,
     onSelectProfile: (Long) -> Unit,
+    onSelectProfileViaGsm: (Long) -> Unit,
     onDisable: () -> Unit,
 ) {
     Scaffold(
@@ -76,6 +79,10 @@ private fun CorrectionSourceContent(
                 ApplyPendingCard()
             }
 
+            if (state.gsmNtripApplyPending) {
+                GsmNtripPendingCard(gsmModemEnabled = state.gsmModemEnabled)
+            }
+
             Text("NTRIP профили", style = MaterialTheme.typography.titleMedium)
             if (state.profiles.isEmpty()) {
                 Text(
@@ -88,8 +95,10 @@ private fun CorrectionSourceContent(
                     items(state.profiles, key = NtripProfile::id) { profile ->
                         ProfileCard(
                             profile = profile,
-                            isActive = profile.id == state.activeProfileId,
-                            onSelect = { onSelectProfile(profile.id) },
+                            isActiveController = profile.id == state.activeProfileId,
+                            isActiveGsm = profile.id == state.gsmNtripActiveProfileId,
+                            onSelectController = { onSelectProfile(profile.id) },
+                            onSelectGsm = { onSelectProfileViaGsm(profile.id) },
                         )
                     }
                 }
@@ -156,27 +165,75 @@ private fun NtripStatusCard(state: NtripState) {
 }
 
 @Composable
-private fun ProfileCard(
-    profile: NtripProfile,
-    isActive: Boolean,
-    onSelect: () -> Unit,
-) {
+private fun GsmNtripPendingCard(gsmModemEnabled: Boolean) {
     NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "NTRIP через GSM приёмника — в очереди",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            val detail = if (gsmModemEnabled) {
+                "Приёмник сам подключится к кастеру через свой GSM-модем после " +
+                    "нажатия «Применить» (system save) на экране диагностики. Интернет " +
+                    "телефона не нужен."
+            } else {
+                "Сначала включите GSM-модем и задайте APN на экране «GSM модем», затем " +
+                    "нажмите «Применить» — обе настройки уйдут в приёмник вместе. Без APN " +
+                    "модем не выйдет в сеть."
+            }
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (gsmModemEnabled) {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(
+    profile: NtripProfile,
+    isActiveController: Boolean,
+    isActiveGsm: Boolean,
+    onSelectController: () -> Unit,
+    onSelectGsm: () -> Unit,
+) {
+    NewtonCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(profile.name, style = MaterialTheme.typography.titleMedium)
             Text(
                 "${profile.host}:${profile.port}/${profile.mountpoint}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
-            if (isActive) {
-                Text(
-                    "Активен",
+            when {
+                isActiveGsm -> Text(
+                    "Активен: NTRIP через GSM приёмника",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
-            } else {
-                NewtonPrimaryButton(onClick = onSelect, text = "Выбрать")
+                isActiveController -> Text(
+                    "Активен: через контроллер (Bluetooth)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NewtonPrimaryButton(
+                        onClick = onSelectGsm,
+                        text = "GSM приёмника",
+                        modifier = Modifier.weight(1f),
+                    )
+                    NewtonSecondaryButton(
+                        onClick = onSelectController,
+                        text = "Через контроллер",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
