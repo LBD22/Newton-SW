@@ -31,6 +31,7 @@ class CorrectionSourceViewModel
             val gsmProfile = gsm?.let { g ->
                 profiles.firstOrNull { it.host == g.host && it.port == g.port && it.mountpoint == g.endpoint }
             }
+            val uhf = patch.input as? InputConfig.Uhf
             CorrectionSourceState(
                 profiles = profiles,
                 activeProfileId = forwarder.activeProfile?.id,
@@ -42,6 +43,9 @@ class CorrectionSourceViewModel
                 gsmNtripActiveProfileId = gsmProfile?.id,
                 gsmNtripApplyPending = gsm != null,
                 gsmModemEnabled = patch.gsm?.enabled == true,
+                uhfActiveSummary = uhf?.let {
+                    "УКВ ${it.frequencyMHz} МГц · ${it.protocol} · ${it.baudrate}"
+                },
             )
         }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CorrectionSourceState())
@@ -71,6 +75,24 @@ class CorrectionSourceViewModel
                         endpoint = profile.mountpoint,
                         login = profile.login,
                         password = profile.password,
+                    ),
+                )
+            }
+        }
+
+        /**
+         * UHF radio as the correction source (`input set uhf <freq> <protocol> <baud>`):
+         * the receiver's internal radio listens for corrections. No controller
+         * internet/Bluetooth forwarding. Queues the input change for Apply.
+         */
+        fun onSelectUhf(frequencyMHz: Double, protocolCode: String, baudrate: Int) {
+            forwarder.stop()
+            pendingChanges.update {
+                it.copy(
+                    input = InputConfig.Uhf(
+                        frequencyMHz = frequencyMHz,
+                        protocol = protocolCode,
+                        baudrate = baudrate,
                     ),
                 )
             }

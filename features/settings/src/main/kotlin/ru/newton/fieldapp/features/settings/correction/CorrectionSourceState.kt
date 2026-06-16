@@ -21,4 +21,6 @@ data class CorrectionSourceState(
     val gsmNtripApplyPending: Boolean = false,
     /** The receiver's GSM modem is enabled in the pending config (APN set). */
     val gsmModemEnabled: Boolean = false,
+    /** Human-readable summary of a queued UHF-radio source (`input set uhf`), if any. */
+    val uhfActiveSummary: String? = null,
 )
