@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,8 +89,17 @@ private fun CorrectionSourceContent(
             )
         },
     ) { padding ->
+        // verticalScroll: NTRIP + УКВ + COM/TCP cards and the «Управление
+        // профилями…» button together exceed one screen, so the bottom (UHF
+        // baud-rate fields and the profile-management entry point) was
+        // unreachable — looked like "add NTRIP profile disappeared".
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             NtripStatusCard(state.ntripState)
@@ -111,8 +120,11 @@ private fun CorrectionSourceContent(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 )
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(state.profiles, key = NtripProfile::id) { profile ->
+                // Plain Column (not LazyColumn) because the whole screen is now
+                // inside a verticalScroll — a lazy list there throws on the
+                // infinite-height constraint. The profile count is tiny.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.profiles.forEach { profile ->
                         ProfileCard(
                             profile = profile,
                             isActiveController = profile.id == state.activeProfileId,
