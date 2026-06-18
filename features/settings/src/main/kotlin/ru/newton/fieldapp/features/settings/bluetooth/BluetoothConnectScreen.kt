@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bluetooth
@@ -119,6 +119,7 @@ private fun BluetoothConnectContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -261,8 +262,11 @@ private fun DevicesSection(
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(devices, key = { it.mac }) { device ->
+                // Plain Column (not LazyColumn): the whole screen is wrapped in a
+                // verticalScroll, where a lazy list throws on infinite height.
+                // The paired-device list is tiny.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    devices.forEach { device ->
                         DeviceRow(
                             name = device.name,
                             mac = device.mac,

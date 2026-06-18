@@ -13,9 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Architecture
-import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Polyline
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
@@ -41,13 +39,11 @@ import ru.newton.fieldapp.core.ui.components.TileAccent
 import ru.newton.fieldapp.core.ui.components.TileData
 import ru.newton.fieldapp.core.ui.components.TileHero
 import ru.newton.fieldapp.core.ui.components.TileSystem
-import ru.newton.fieldapp.core.ui.components.NewtonTile
 import ru.newton.fieldapp.features.survey.codesets.CodeSetsScreen
 import ru.newton.fieldapp.features.survey.continuous.ContinuousSurveyScreen
 import ru.newton.fieldapp.features.survey.defaults.SurveyDefaultsScreen
 import ru.newton.fieldapp.features.survey.line.LineSurveyScreen
 import ru.newton.fieldapp.features.survey.map.MapSurveyScreen
-import ru.newton.fieldapp.features.survey.point.PointSurveyScreen
 import ru.newton.fieldapp.features.survey.stakeout.StakeoutHistoryScreen
 import ru.newton.fieldapp.features.survey.stakeout.StakeoutPickerScreen
 import ru.newton.fieldapp.features.survey.stakeout.StakeoutToLineScreen
@@ -57,7 +53,6 @@ import ru.newton.fieldapp.features.survey.track.TrackRecordingScreen
 const val SURVEY_TAB_ROUTE = "survey"
 
 private const val INDEX_ROUTE = "survey/index"
-private const val MAP_ROUTE = "survey/map"
 private const val POINT_ROUTE = "survey/point"
 private const val LINE_ROUTE = "survey/line"
 private const val CONTINUOUS_ROUTE = "survey/continuous"
@@ -73,8 +68,14 @@ private fun stakeoutTargetRoute(id: Long) = "survey/stakeout/$id"
 fun NavGraphBuilder.surveyGraph(navController: NavController) {
     navigation(startDestination = INDEX_ROUTE, route = SURVEY_TAB_ROUTE) {
         composable(INDEX_ROUTE) { SurveyIndexScreen(navController) }
-        composable(MAP_ROUTE) { MapSurveyScreen(onBack = { navController.popBackStack() }) }
-        composable(POINT_ROUTE) { PointSurveyScreen(onBack = { navController.popBackStack() }) }
+        // Unified map-centric capture screen (absorbs the old standalone «Карта»):
+        // map background + surveyed points + epoch-averaging capture + options.
+        composable(POINT_ROUTE) {
+            MapSurveyScreen(
+                onBack = { navController.popBackStack() },
+                onOpenOptions = { navController.navigate(DEFAULTS_ROUTE) },
+            )
+        }
         composable(LINE_ROUTE) { LineSurveyScreen(onBack = { navController.popBackStack() }) }
         composable(CONTINUOUS_ROUTE) { ContinuousSurveyScreen(onBack = { navController.popBackStack() }) }
         composable("survey/codesets") { CodeSetsScreen(onBack = { navController.popBackStack() }) }
@@ -129,10 +130,13 @@ private fun SurveyIndexScreen(navController: NavController) {
             // Hero "Снять точку" 2×2 + two accent tiles stacked to the right
             // — primary survey action gets focal weight; map/line are the
             // next most-used.
+            // Hero "Снять точку" now opens the map-centric capture screen
+            // (map + surveyed points + averaging) — the old separate «Карта»
+            // tile is gone, folded into this one.
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TileHero(
                     title = "Снять\nточку",
-                    sub = "Усреднение эпох",
+                    sub = "Карта + усреднение",
                     icon = Icons.Default.AddLocationAlt,
                     onClick = { navController.navigate(POINT_ROUTE) },
                     modifier = Modifier.weight(2f).aspectRatio(1f),
@@ -142,15 +146,15 @@ private fun SurveyIndexScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     TileAccent(
-                        title = "Карта",
-                        icon = Icons.Default.Map,
-                        onClick = { navController.navigate(MAP_ROUTE) },
-                        modifier = Modifier.aspectRatio(1f),
-                    )
-                    TileAccent(
                         title = "Линия",
                         icon = Icons.Default.Route,
                         onClick = { navController.navigate(LINE_ROUTE) },
+                        modifier = Modifier.aspectRatio(1f),
+                    )
+                    TileAccent(
+                        title = "Непрерывно",
+                        icon = Icons.Default.AllInclusive,
+                        onClick = { navController.navigate(CONTINUOUS_ROUTE) },
                         modifier = Modifier.aspectRatio(1f),
                     )
                 }
@@ -158,12 +162,6 @@ private fun SurveyIndexScreen(navController: NavController) {
 
             // Data row — operational views over collected data
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TileData(
-                    title = "Непрерывно",
-                    icon = Icons.Default.AllInclusive,
-                    onClick = { navController.navigate(CONTINUOUS_ROUTE) },
-                    modifier = Modifier.weight(1f).aspectRatio(1f),
-                )
                 TileData(
                     title = "Вынос точки",
                     icon = Icons.Default.Straighten,
@@ -176,6 +174,7 @@ private fun SurveyIndexScreen(navController: NavController) {
                     onClick = { navController.navigate(STAKEOUT_LINE_ROUTE) },
                     modifier = Modifier.weight(1f).aspectRatio(1f),
                 )
+                Spacer(modifier = Modifier.weight(1f))
             }
 
             // System row — history, track recording, CAD, params

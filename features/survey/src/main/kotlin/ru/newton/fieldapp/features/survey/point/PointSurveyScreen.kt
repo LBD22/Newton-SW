@@ -3,6 +3,7 @@ package ru.newton.fieldapp.features.survey.point
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
@@ -23,10 +23,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import ru.newton.fieldapp.core.ui.components.NewtonCard
-import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
-import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
-import ru.newton.fieldapp.core.ui.components.NewtonSuccessButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.newton.fieldapp.core.ui.components.NewtonCard
+import ru.newton.fieldapp.core.ui.components.NewtonPrimaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSecondaryButton
+import ru.newton.fieldapp.core.ui.components.NewtonSuccessButton
 import ru.newton.fieldapp.gnss.data.FixQuality
 
 @Composable

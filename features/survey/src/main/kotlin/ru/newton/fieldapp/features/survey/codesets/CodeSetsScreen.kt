@@ -7,9 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -139,6 +138,7 @@ fun CodeSetsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -193,8 +193,11 @@ fun CodeSetsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(state.sets, key = CodeSet::name) { set ->
+                        // Plain Column (not LazyColumn): the whole screen is in a
+                        // verticalScroll, where a lazy list throws on infinite
+                        // height. Saved-set count is small.
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            state.sets.forEach { set ->
                                 SetRow(
                                     set = set,
                                     onLoad = { viewModel.load(set.name) },

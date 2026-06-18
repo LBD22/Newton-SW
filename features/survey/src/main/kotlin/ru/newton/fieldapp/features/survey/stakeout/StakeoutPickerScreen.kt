@@ -1,11 +1,9 @@
 package ru.newton.fieldapp.features.survey.stakeout
 
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import ru.newton.fieldapp.core.ui.components.EmptyState
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,9 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.filled.Flag
-import ru.newton.fieldapp.core.ui.components.NewtonCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,11 +29,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import ru.newton.fieldapp.core.ui.components.EmptyState
+import ru.newton.fieldapp.core.ui.components.NewtonCard
 import ru.newton.fieldapp.data.preferences.ActiveProjectStore
 import ru.newton.fieldapp.domain.model.Point
 import ru.newton.fieldapp.domain.repository.PointRepository
