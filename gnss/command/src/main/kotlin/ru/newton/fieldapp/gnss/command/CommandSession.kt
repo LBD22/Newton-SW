@@ -189,22 +189,44 @@ class CommandSession(
         // command sits in the channel and gets consumed by the next send —
         // shifting every acknowledgement off-by-one for the rest of the session.
         // Safe under sendMutex: no other send can be enqueuing here concurrently.
-        while (replyChannel.tryReceive().isSuccess) Unit
+        var drained = 0
+        while (replyChannel.tryReceive().isSuccess) drained++
+        if (drained > 0) log.cmd("→ drained $drained stale items before '$command'")
         log.cmd("→ $command")
         transport.write((command + "\r\n").toByteArray(Charsets.US_ASCII))
     }
 
-    private suspend fun awaitOk(originalCommand: String): OkKind? = withTimeoutOrNull(REPLY_TIMEOUT_MS) {
-        while (true) {
-            val line = replyChannel.receive().trim()
-            if (line.isEmpty() || line == originalCommand || line.startsWith("$")) continue
-            val ok = OkKind.fromToken(line)
-            if (ok != null) return@withTimeoutOrNull ok
-            // Otherwise a leading info line — keep waiting for the OK that follows.
-            log.cmd("← (info) $line")
+    private suspend fun awaitOk(originalCommand: String): OkKind? {
+        var linesReceived = 0
+        val result = withTimeoutOrNull(REPLY_TIMEOUT_MS) {
+            while (true) {
+                val line = replyChannel.receive().trim()
+                if (line.isEmpty() || line == originalCommand || line.startsWith("$")) continue
+                linesReceived++
+                val ok = OkKind.fromToken(line)
+                if (ok != null) return@withTimeoutOrNull ok
+                // Otherwise a leading info line — keep waiting for the OK that follows.
+                log.cmd("← (info) $line")
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
         }
-        @Suppress("UNREACHABLE_CODE")
-        null
+        if (result == null) {
+            // Two distinct failure modes — the count alone points to the root cause:
+            //   linesReceived == 0 → CommandSession.start() never called, or BT zombie
+            //       socket (write() succeeds but no bytes come back — Android keeps
+            //       LinkState.Connected after the radio link silently dies).
+            //   linesReceived  > 0 → receiver is sending data but none matched OkKind;
+            //       with the binary-filter fix this should no longer happen, but if it
+            //       does the "(info)" lines above show what the aggregator produced.
+            val diagnosis = if (linesReceived == 0) {
+                "0 lines received — zombie socket or CommandSession.start() not called"
+            } else {
+                "$linesReceived lines received, none matched OkKind — check preceding (info) lines"
+            }
+            log.cmd("← TIMEOUT ${REPLY_TIMEOUT_MS}ms for '$originalCommand': $diagnosis")
+        }
+        return result
     }
 
     private suspend fun awaitInfoLine(originalCommand: String): String? = withTimeoutOrNull(REPLY_TIMEOUT_MS) {

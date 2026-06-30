@@ -270,6 +270,13 @@ class NtripRawStreamer(
         } else {
             plain.also { it.soTimeout = READ_TIMEOUT_MS }
         }
+    }.onFailure { t ->
+        // Log the specific failure type — "Connection refused" vs "Network unreachable" vs
+        // "UnknownHostException" are all very different root causes, and without this the
+        // log just shows "failed" with no diagnosis possible (field reports Баг-003).
+        log.ntrip(
+            "openSocket ${profile.host}:${profile.port} ${t.javaClass.simpleName}: ${t.message}",
+        )
     }.getOrNull()
 
     private fun readLine(input: InputStream): String? {

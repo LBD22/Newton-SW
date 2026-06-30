@@ -85,7 +85,7 @@ class NtripClient(
             body
         } catch (t: Throwable) {
             _state.value = NtripState.Failed(t.message ?: "Source-table fetch failed", null)
-            log.ntrip("NTRIP source-table $host:$port failed: ${t.message}")
+            log.ntrip("NTRIP source-table $host:$port ${t.javaClass.simpleName}: ${t.message}")
             throw t
         } finally {
             runCatching { socket?.close() }
